@@ -1,12 +1,16 @@
 # Agent Guidelines for Tallywind
 
+This is an app that allows coders to count and tally up how many tailwind
+classes they're using. It stores data to a database so that we can provide a
+global leaderboard of tailwind classes, alongside some other stats.
+
 ## Build/Test Commands
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run check` - Type check with svelte-check
-- `npm run format` - Format code with Prettier
-- `npm run lint` - Check code formatting
+- `bun run dev` - Start development server
+- `bun run build` - Build for production
+- `bun run preview` - Preview production build
+- `bun run check` - Type check with svelte-check
+- `bun run format` - Format code with Prettier
+- `bun run lint` - Check code formatting
 
 ## Code Style
 - **Formatting**: Uses Prettier with tabs, single quotes, no trailing commas, 100 char width

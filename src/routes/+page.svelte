@@ -137,185 +137,240 @@
 	}
 </script>
 
-<main class="container mx-auto px-4 py-8">
-	<!-- Hero Section -->
-	<div
-		class="hero from-primary/10 via-secondary/5 to-accent/10 mb-12 min-h-[60vh] rounded-3xl bg-gradient-to-br"
-	>
-		<div class="hero-content text-center">
-			<div class="max-w-4xl">
-				<div class="mb-8 flex w-full items-center justify-between">
-					<div class="flex-1"></div>
-					<h1
-						class="from-primary-content to-secondary-content bg-gradient-to-r
-						bg-clip-text text-6xl font-bold text-transparent"
-					>
-						Tallywind
-					</h1>
-					<div class="flex flex-1 justify-end">
-						<a href="/global" class="btn btn-outline">Global Stats</a>
+<main class="h-screen overflow-hidden border-2 border-base-content flex flex-col">
+	<!-- Header Grid -->
+	<div class="border-base-content grid grid-cols-1 border-b-2 md:grid-cols-3 flex-shrink-0">
+		<!-- Title Section -->
+		<div class="border-base-content border-r-2 p-6 md:col-span-2">
+			<h1 class="text-4xl font-bold tracking-wider uppercase">TALLYWIND</h1>
+			<p class="mt-2 font-mono text-lg">TAILWIND CLASS COUNTER & ANALYZER</p>
+		</div>
+
+		<!-- Navigation -->
+		<div class="border-base-content flex items-center justify-center p-6">
+			<a
+				href="/global"
+				class="border-base-content hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
+			>
+				GLOBAL STATS
+			</a>
+		</div>
+	</div>
+
+	<!-- Main Content Grid -->
+	<div class="grid grid-cols-1 lg:grid-cols-2 flex-1 overflow-hidden">
+		<!-- Left Column: Description & Features -->
+		<div class="border-base-content border-r-2 flex flex-col">
+			<!-- Description -->
+			<div class="border-base-content border-b-2 p-6 flex-shrink-0">
+				<h2 class="mb-4 text-xl font-bold uppercase">DISCOVER HIDDEN PATTERNS</h2>
+				<p class="font-mono leading-relaxed">
+					Analyze GitHub repositories to count and categorize every Tailwind CSS class. Reveal
+					insights about your design system usage and optimize your styling approach.
+				</p>
+			</div>
+
+			<!-- Features Grid -->
+			<div class="flex-1 flex flex-col">
+				<div class="border-base-content border-b-2 p-6 flex-1 flex items-center">
+					<div class="flex items-start gap-4 w-full">
+						<div class="text-2xl">📊</div>
+						<div>
+							<h3 class="font-bold uppercase">USAGE STATISTICS</h3>
+							<p class="mt-1 font-mono text-sm">
+								Detailed breakdowns of class frequency and most-used utilities
+							</p>
+						</div>
 					</div>
 				</div>
 
-				<p class="text-base-content/80 mb-8 text-xl leading-relaxed">
-					Discover the <span class="text-primary-content font-semibold">hidden patterns</span> in your
-					codebase. Tallywind analyzes your GitHub repositories to count and categorize every Tailwind
-					CSS class, revealing insights about your design system usage and helping you optimize your
-					styling approach.
-				</p>
+				<div class="border-base-content border-b-2 p-6 flex-1 flex items-center">
+					<div class="flex items-start gap-4 w-full">
+						<div class="text-2xl">🎨</div>
+						<div>
+							<h3 class="font-bold uppercase">DESIGN PATTERNS</h3>
+							<p class="mt-1 font-mono text-sm">
+								Identify common styling patterns and component opportunities
+							</p>
+						</div>
+					</div>
+				</div>
 
-				<div class="mb-8 flex flex-wrap justify-center gap-4">
-					<div class="badge badge-lg badge-primary">📊 Class Analytics</div>
-					<div class="badge badge-lg badge-secondary">🔍 Pattern Discovery</div>
-					<div class="badge badge-lg badge-accent">⚡ Real-time Analysis</div>
+				<div class="p-6 flex-1 flex items-center">
+					<div class="flex items-start gap-4 w-full">
+						<div class="text-2xl">⚡</div>
+						<div>
+							<h3 class="font-bold uppercase">OPTIMIZATION INSIGHTS</h3>
+							<p class="mt-1 font-mono text-sm">Spot unused classes and optimize CSS bundle size</p>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
 
-	<div class="card bg-base-200 mb-8 p-6 shadow-xl">
-		<h2 class="mb-4 text-xl font-semibold">Analyze GitHub Repository</h2>
-		<div class="flex flex-col gap-4">
-			<div class="form-control w-full">
-				<label class="label" for="repo-url">
-					<span class="label-text">GitHub Repository URL</span>
-				</label>
-				<div class="flex gap-2">
-					<input
-						bind:value={repoUrl}
-						type="text"
-						id="repo-url"
-						placeholder="https://github.com/username/repo"
-						class="input input-bordered flex-1"
-					/>
-					<button class="btn btn-primary" onclick={handleAnalyze} disabled={isAnalyzing}>
-						{isAnalyzing ? 'Analyzing...' : 'Analyze'}
+		<!-- Right Column: Analysis Form -->
+		<div class="flex flex-col">
+			<div class="border-base-content border-b-2 p-6 flex-shrink-0">
+				<h2 class="mb-4 text-xl font-bold uppercase">ANALYZE REPOSITORY</h2>
+
+				<div class="space-y-4">
+					<div>
+						<label class="mb-2 block font-mono text-sm uppercase" for="repo-url">
+							GITHUB REPOSITORY URL
+						</label>
+						<input
+							bind:value={repoUrl}
+							type="text"
+							id="repo-url"
+							placeholder="https://github.com/username/repo"
+							class="border-base-content focus:bg-base-200 w-full border-2 bg-transparent p-3 font-mono transition-colors"
+						/>
+					</div>
+
+					<button
+						class="border-base-content hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+						onclick={handleAnalyze}
+						disabled={isAnalyzing}
+					>
+						{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
 					</button>
+
+					{#if error}
+						<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">
+							ERROR: {error}
+						</div>
+					{/if}
 				</div>
-				{#if error}
-					<div class="text-error mt-2">{error}</div>
-				{/if}
 			</div>
-		</div>
-	</div>
 
-	<!-- Features Section -->
-	<div class="mb-12 grid gap-6 md:grid-cols-3">
-		<div class="card bg-base-100 shadow-xl">
-			<div class="card-body text-center">
-				<div class="mb-4 text-4xl">📈</div>
-				<h3 class="card-title justify-center">Usage Statistics</h3>
-				<p class="text-base-content/70">
-					Get detailed breakdowns of class frequency and discover your most-used Tailwind utilities
-				</p>
-			</div>
-		</div>
-
-		<div class="card bg-base-100 shadow-xl">
-			<div class="card-body text-center">
-				<div class="mb-4 text-4xl">🎨</div>
-				<h3 class="card-title justify-center">Design Patterns</h3>
-				<p class="text-base-content/70">
-					Identify common styling patterns and potential opportunities for component extraction
-				</p>
-			</div>
-		</div>
-
-		<div class="card bg-base-100 shadow-xl">
-			<div class="card-body text-center">
-				<div class="mb-4 text-4xl">⚡</div>
-				<h3 class="card-title justify-center">Optimization Insights</h3>
-				<p class="text-base-content/70">
-					Spot unused classes and optimize your CSS bundle size for better performance
-				</p>
+			<!-- Status Badges -->
+			<div class="flex-1 flex items-center justify-center p-6">
+				<div class="grid grid-cols-1 gap-0 w-full">
+					<div class="border-base-content border-2 p-4 text-center">
+						<div class="font-mono text-sm uppercase mb-1">CLASS</div>
+						<div class="font-mono text-sm uppercase">ANALYTICS</div>
+					</div>
+					<div class="border-base-content border-2 border-t-0 p-4 text-center">
+						<div class="font-mono text-sm uppercase mb-1">PATTERN</div>
+						<div class="font-mono text-sm uppercase">DISCOVERY</div>
+					</div>
+					<div class="border-base-content border-2 border-t-0 p-4 text-center">
+						<div class="font-mono text-sm uppercase mb-1">REAL-TIME</div>
+						<div class="font-mono text-sm uppercase">ANALYSIS</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>
 
 	<!-- Progress Display -->
 	{#if progress && isAnalyzing}
-		<div class="card bg-base-200 mb-8 p-6 shadow-xl">
-			<h2 class="mb-4 text-xl font-semibold">Analysis Progress</h2>
+		<div class="border-base-content border-t-2">
+			<div class="border-base-content border-b-2 p-6">
+				<h2 class="mb-4 text-xl font-bold uppercase">ANALYSIS PROGRESS</h2>
 
-			<!-- Status and Progress Bar -->
-			<div class="mb-4">
-				<div class="mb-2 flex items-center justify-between">
-					<span class="text-sm font-medium capitalize">{progress.status}</span>
+				<div class="grid grid-cols-1 gap-0 md:grid-cols-2">
+					<div class="border-base-content border-2 p-4">
+						<div class="mb-2 font-mono text-sm uppercase">STATUS</div>
+						<div class="font-bold uppercase">{progress.status}</div>
+					</div>
+
 					{#if progress.totalFiles && progress.filesProcessed !== undefined}
-						<span class="text-base-content/70 text-sm">
-							{progress.filesProcessed} / {progress.totalFiles} files
-						</span>
+						<div
+							class="border-base-content border-2 border-t-0 border-l-0 p-4 md:border-t-2 md:border-l-2"
+						>
+							<div class="mb-2 font-mono text-sm uppercase">FILES PROCESSED</div>
+							<div class="font-bold">{progress.filesProcessed} / {progress.totalFiles}</div>
+						</div>
 					{/if}
 				</div>
 
 				{#if progress.totalFiles}
-					<progress
-						class="progress progress-primary w-full"
-						value={progress.filesProcessed || 0}
-						max={progress.totalFiles}
-					></progress>
-				{:else}
-					<progress class="progress progress-primary w-full"></progress>
+					<div class="border-base-content mt-4 border-2">
+						<div
+							class="bg-base-content h-4 transition-all duration-300"
+							style="width: {((progress.filesProcessed || 0) / progress.totalFiles) * 100}%"
+						></div>
+					</div>
+				{/if}
+
+				{#if progress.currentFile}
+					<div class="border-base-content mt-4 border-2 p-3">
+						<div class="mb-1 font-mono text-xs uppercase">CURRENTLY PROCESSING</div>
+						<div class="font-mono text-sm break-all">{progress.currentFile}</div>
+					</div>
 				{/if}
 			</div>
-
-			<!-- Current File -->
-			{#if progress.currentFile}
-				<div class="mb-4">
-					<span class="text-base-content/70 text-sm">Currently processing:</span>
-					<div class="bg-base-300 mt-1 rounded p-2 font-mono text-sm">
-						{progress.currentFile}
-					</div>
-				</div>
-			{/if}
 		</div>
 	{/if}
 
 	{#if repoStats}
-		<div class="card bg-base-200 mb-8 p-6 shadow-xl">
-			<h2 class="mb-4 text-xl font-semibold">
-				Results for {repoStats.repo.owner}/{repoStats.repo.name}
-			</h2>
+		<div class="border-base-content border-t-2">
+			<!-- Results Header -->
+			<div class="border-base-content border-b-2 p-6">
+				<h2 class="text-xl font-bold uppercase">
+					RESULTS: {repoStats.repo.owner}/{repoStats.repo.name}
+				</h2>
+			</div>
 
-			<div class="stats mb-6 shadow">
-				<div class="stat">
-					<div class="stat-title">Total Tailwind Classes</div>
-					<div class="stat-value">{repoStats.total}</div>
-					<div class="stat-desc">Unique Classes: {Object.keys(repoStats.classCounts).length}</div>
+			<!-- Stats Grid -->
+			<div class="grid grid-cols-1 md:grid-cols-2">
+				<div class="border-base-content border-r-2 p-6">
+					<div class="border-base-content border-2 p-4 text-center">
+						<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
+						<div class="text-3xl font-bold">{repoStats.total}</div>
+					</div>
 				</div>
 
-				<div class="stat">
-					<div class="stat-title">Last Updated</div>
-					<div class="stat-value text-lg">
-						{new Date(repoStats.lastUpdated).toLocaleDateString()}
-					</div>
-					<div class="stat-desc">
-						{new Date(repoStats.lastUpdated).toLocaleTimeString()}
+				<div class="p-6">
+					<div class="border-base-content border-2 p-4 text-center">
+						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
+						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
 					</div>
 				</div>
 			</div>
 
-			<h3 class="mb-2 text-lg font-semibold">Top 20 Classes</h3>
-			<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each repoStats.topClasses as { className, count }}
-					<div class="bg-base-300 flex justify-between rounded-lg p-2">
-						<div class="font-mono">{className}</div>
-						<div class="badge badge-primary">{count}</div>
-					</div>
-				{/each}
-			</div>
-
-			<details>
-				<summary class="cursor-pointer font-semibold">Show all classes</summary>
-				<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each Object.entries(repoStats.classCounts).sort(([, countA], [, countB]) => countB - countA) as [className, count]}
-						<div class="bg-base-300 flex justify-between rounded-lg p-2">
+			<!-- Top Classes -->
+			<div class="border-base-content border-t-2 p-6">
+				<h3 class="mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
+				<div class="grid grid-cols-1 gap-0">
+					{#each repoStats.topClasses as { className, count }, index}
+						<div
+							class="border-2 {index > 0
+								? 'border-t-0'
+								: ''} border-base-content flex items-center justify-between p-3"
+						>
 							<div class="font-mono">{className}</div>
-							<div class="badge badge-primary">{count}</div>
+							<div class="border-base-content border px-2 py-1 font-mono text-sm">{count}</div>
 						</div>
 					{/each}
 				</div>
-			</details>
+			</div>
+
+			<!-- All Classes Toggle -->
+			<div class="border-base-content border-t-2">
+				<details class="group">
+					<summary
+						class="border-base-content hover:bg-base-200 cursor-pointer border-b-2 p-6 font-bold uppercase transition-colors"
+					>
+						SHOW ALL CLASSES
+					</summary>
+					<div class="p-6">
+						<div class="grid max-h-96 grid-cols-1 gap-0 overflow-y-auto">
+							{#each Object.entries(repoStats.classCounts).sort(([, countA], [, countB]) => countB - countA) as [className, count], index}
+								<div
+									class="border-2 {index > 0
+										? 'border-t-0'
+										: ''} border-base-content flex items-center justify-between p-2"
+								>
+									<div class="font-mono text-sm">{className}</div>
+									<div class="border-base-content border px-2 py-1 font-mono text-xs">{count}</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</details>
+			</div>
 		</div>
 	{/if}
 </main>
