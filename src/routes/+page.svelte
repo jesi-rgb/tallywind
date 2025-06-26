@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import type { TailwindStats } from '$lib/services/repository';
 
-
 	let repoUrl = $state('https://github.com/jesi-rgb/conduit');
 	let isAnalyzing = $state(false);
 	let error = $state<string | null>(null);
@@ -85,11 +84,11 @@
 						currentEventType = line.substring(7);
 						continue;
 					}
-					
+
 					if (line.startsWith('data: ') && line.length > 6) {
 						try {
 							const data = JSON.parse(line.substring(6));
-							
+
 							// Handle different event types
 							if (currentEventType === 'progress') {
 								progress = {
@@ -130,7 +129,6 @@
 					}
 				}
 			}
-
 		} catch (e) {
 			console.error('Error analyzing repository:', e);
 			error = 'An error occurred while analyzing the repository.';
@@ -140,7 +138,40 @@
 </script>
 
 <main class="container mx-auto px-4 py-8">
-	<h1 class="mb-8 text-5xl font-semibold">Tallywind</h1>
+	<!-- Hero Section -->
+	<div
+		class="hero from-primary/10 via-secondary/5 to-accent/10 mb-12 min-h-[60vh] rounded-3xl bg-gradient-to-br"
+	>
+		<div class="hero-content text-center">
+			<div class="max-w-4xl">
+				<div class="mb-8 flex w-full items-center justify-between">
+					<div class="flex-1"></div>
+					<h1
+						class="from-primary-content to-secondary-content bg-gradient-to-r
+						bg-clip-text text-6xl font-bold text-transparent"
+					>
+						Tallywind
+					</h1>
+					<div class="flex flex-1 justify-end">
+						<a href="/global" class="btn btn-outline">Global Stats</a>
+					</div>
+				</div>
+
+				<p class="text-base-content/80 mb-8 text-xl leading-relaxed">
+					Discover the <span class="text-primary-content font-semibold">hidden patterns</span> in your
+					codebase. Tallywind analyzes your GitHub repositories to count and categorize every Tailwind
+					CSS class, revealing insights about your design system usage and helping you optimize your
+					styling approach.
+				</p>
+
+				<div class="mb-8 flex flex-wrap justify-center gap-4">
+					<div class="badge badge-lg badge-primary">📊 Class Analytics</div>
+					<div class="badge badge-lg badge-secondary">🔍 Pattern Discovery</div>
+					<div class="badge badge-lg badge-accent">⚡ Real-time Analysis</div>
+				</div>
+			</div>
+		</div>
+	</div>
 
 	<div class="card bg-base-200 mb-8 p-6 shadow-xl">
 		<h2 class="mb-4 text-xl font-semibold">Analyze GitHub Repository</h2>
@@ -164,6 +195,39 @@
 				{#if error}
 					<div class="text-error mt-2">{error}</div>
 				{/if}
+			</div>
+		</div>
+	</div>
+
+	<!-- Features Section -->
+	<div class="mb-12 grid gap-6 md:grid-cols-3">
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body text-center">
+				<div class="mb-4 text-4xl">📈</div>
+				<h3 class="card-title justify-center">Usage Statistics</h3>
+				<p class="text-base-content/70">
+					Get detailed breakdowns of class frequency and discover your most-used Tailwind utilities
+				</p>
+			</div>
+		</div>
+
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body text-center">
+				<div class="mb-4 text-4xl">🎨</div>
+				<h3 class="card-title justify-center">Design Patterns</h3>
+				<p class="text-base-content/70">
+					Identify common styling patterns and potential opportunities for component extraction
+				</p>
+			</div>
+		</div>
+
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body text-center">
+				<div class="mb-4 text-4xl">⚡</div>
+				<h3 class="card-title justify-center">Optimization Insights</h3>
+				<p class="text-base-content/70">
+					Spot unused classes and optimize your CSS bundle size for better performance
+				</p>
 			</div>
 		</div>
 	</div>
@@ -204,8 +268,6 @@
 					</div>
 				</div>
 			{/if}
-
-
 		</div>
 	{/if}
 
@@ -257,4 +319,3 @@
 		</div>
 	{/if}
 </main>
-

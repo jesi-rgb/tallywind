@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BarX, BarY, Plot, RectY, RuleY, binX, groupX } from 'svelteplot';
+	import { BarX, BarY, Plot, RectY, RuleY, binX, groupX, HTMLTooltip } from 'svelteplot';
 	import { onMount } from 'svelte';
 
 	interface GlobalClass {
@@ -24,6 +24,7 @@
 	let loading = $state(false);
 	let error = $state('');
 	let limit = $state(50);
+	let hovered = $state();
 
 	async function fetchGlobalData() {
 		loading = true;
@@ -90,13 +91,24 @@
 		<!-- Global Statistics -->
 
 		<Plot x={{ tickRotate: -90 }} y={{ grid: true }}>
-			<BarY
-				sort="descending"
-				data={globalData?.topClasses}
-				x="classname"
-				y="count"
-				fill="var(--color-primary)"
-			/>
+			{#snippet overlay()}
+				<HTMLTooltip
+					class="bg-base-200 rounded-box transition-transform"
+					data={globalData?.topClasses}
+					x="classname"
+					y="count"
+				>
+					{#snippet children({ datum })}
+						<div class="bg-base-200">
+							<div>Classname: {datum.classname}</div>
+							<div>Count: {datum.count}</div>
+						</div>
+					{/snippet}
+				</HTMLTooltip>
+			{/snippet}
+
+			<BarY sort="descending" data={globalData?.topClasses} x="classname" y="count" />
+
 			<RuleY data={[0]} />
 		</Plot>
 
@@ -105,26 +117,30 @@
 				<div class="stat-title">Total Repositories</div>
 				<div
 					class="stat-value
-					text-primary"
+					text-primary-content"
 				>
-					{globalData.stats.totalRepos - globalData.stats.eligibleRepos}
+					{globalData.stats.eligibleRepos}
 				</div>
 			</div>
 			<div class="stat bg-base-200 rounded-lg">
 				<div class="stat-title">Total Classes</div>
-				<div class="stat-value text-primary">{globalData.stats.totalClasses.toLocaleString()}</div>
+				<div class="stat-value text-primary-content">
+					{globalData.stats.totalClasses.toLocaleString()}
+				</div>
 			</div>
 			<div class="stat bg-base-200 rounded-lg">
 				<div class="stat-title">Unique Classes</div>
-				<div class="stat-value text-primary">{globalData.stats.uniqueClasses.toLocaleString()}</div>
+				<div class="stat-value text-primary-content">
+					{globalData.stats.uniqueClasses.toLocaleString()}
+				</div>
 			</div>
 		</div>
 
 		<!-- Controls -->
 		<div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-			<h2 class="text-2xl font-semibold">Most Popular Classes</h2>
+			<h2 class="w-max text-2xl font-semibold">Most Popular Classes</h2>
 			<div class="flex items-center gap-2">
-				<label for="limit" class="text-sm font-medium">Show top:</label>
+				<label for="limit" class="label w-max text-sm font-medium">Show top:</label>
 				<select
 					id="limit"
 					bind:value={limit}
@@ -191,3 +207,10 @@
 		{/if}
 	{/if}
 </div>
+
+<style>
+	:global(div.tooltip) {
+		background: var(--color-base-100) !important;
+		border-radius: 1em !important;
+	}
+</style>
