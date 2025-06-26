@@ -1,0 +1,28 @@
+@import url('https://api.fontshare.com/v2/css?f[]=tabular@1&display=swap');
+
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+
+@font-face {
+	font-family: 'AT Name Sans Variable';
+	src: url("https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/AT-NameSansVariable.ttf");
+	weight: 1 1000;
+}
+
+
+@plugin "daisyui" {
+	themes: light --default, dark --prefersdark;
+}
+
+
+@theme {
+	--font-sans: AT Name Sans Variable;
+	--font-mono: Tabular;
+}
+
+:root {
+	svg {
+		font-family: var(--font-sans);
+	}
+}
