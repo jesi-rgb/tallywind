@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 export const GET = async ({ params }: RequestEvent) => {
 	try {
 		const repoId = parseInt(params.repoId || '0');
-		
+
 		if (!repoId) {
 			return json({ error: 'Invalid repository ID' }, { status: 400 });
 		}
@@ -39,7 +39,9 @@ export const GET = async ({ params }: RequestEvent) => {
 				totalFiles: repo.total_files || 0,
 				processedFiles: repo.processed_files || 0,
 				totalClasses: repo.total_classes || 0,
-				percentage: repo.total_files ? Math.round((repo.processed_files || 0) / repo.total_files * 100) : 0
+				percentage: repo.total_files
+					? Math.round(((repo.processed_files || 0) / repo.total_files) * 100)
+					: 0
 			},
 			isEligible: repo.is_eligible,
 			eligibilityReason: repo.eligibility_reason

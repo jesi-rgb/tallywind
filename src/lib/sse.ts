@@ -1,8 +1,4 @@
-export type SSEEventType = 
-	| 'progress' 
-	| 'file-processed' 
-	| 'completed' 
-	| 'error';
+export type SSEEventType = 'progress' | 'file-processed' | 'completed' | 'error';
 
 export type SSEProgressEvent = {
 	type: 'progress';
@@ -64,7 +60,7 @@ export class SSEEmitter {
 
 export function createSSEResponse(): { response: Response; emitter: SSEEmitter } {
 	let controller: ReadableStreamDefaultController<string>;
-	
+
 	const stream = new ReadableStream<string>({
 		start(ctrl) {
 			controller = ctrl;
@@ -77,13 +73,13 @@ export function createSSEResponse(): { response: Response; emitter: SSEEmitter }
 		headers: {
 			'Content-Type': 'text/event-stream',
 			'Cache-Control': 'no-cache',
-			'Connection': 'keep-alive',
+			Connection: 'keep-alive',
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Headers': 'Cache-Control'
 		}
 	});
 
 	const emitter = new SSEEmitter(controller!);
-	
+
 	return { response, emitter };
 }

@@ -1,4 +1,13 @@
-import { pgTable, serial, text, integer, timestamp, primaryKey, varchar, boolean } from 'drizzle-orm/pg-core';
+import {
+	pgTable,
+	serial,
+	text,
+	integer,
+	timestamp,
+	primaryKey,
+	varchar,
+	boolean
+} from 'drizzle-orm/pg-core';
 
 // Table for storing repository information
 export const repositories = pgTable('repositories', {
@@ -21,7 +30,9 @@ export const repositories = pgTable('repositories', {
 // Table for storing Tailwind class counts per repository
 export const tailwindClasses = pgTable('tailwind_classes', {
 	id: serial('id').primaryKey(),
-	repo_id: integer('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
+	repo_id: integer('repo_id')
+		.notNull()
+		.references(() => repositories.id, { onDelete: 'cascade' }),
 	class_name: varchar('class_name', { length: 255 }).notNull(),
 	count: integer('count').notNull().default(0)
 }).enableRLS();
@@ -33,8 +44,6 @@ export const apiRequests = pgTable('api_requests', {
 	endpoint: varchar('endpoint', { length: 255 }).notNull(),
 	requested_at: timestamp('requested_at').notNull().defaultNow()
 }).enableRLS();
-
-
 
 // Types based on the schema
 export type Repository = typeof repositories.$inferSelect;

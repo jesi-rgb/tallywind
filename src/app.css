@@ -3,21 +3,19 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
-
 @font-face {
 	font-family: 'AT Name Sans Variable';
-	src: url("https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/AT-NameSansVariable.ttf");
+	src: url('https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/AT-NameSansVariable.ttf');
 	weight: 1 1000;
 }
-
 
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {
-	name: "dancingview";
+	name: 'dancingview';
 	default: true;
 	prefersdark: false;
-	color-scheme: "light";
+	color-scheme: 'light';
 	--color-base-100: oklch(98% 0.001 106.423);
 	--color-base-200: oklch(97% 0.001 106.424);
 	--color-base-300: oklch(92% 0.003 48.717);
@@ -47,7 +45,6 @@
 	--depth: 1;
 	--noise: 0;
 }
-
 
 @theme {
 	--font-sans: AT Name Sans Variable;

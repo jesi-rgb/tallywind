@@ -5,7 +5,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 export const GET = async ({ url }: RequestEvent) => {
 	try {
 		const limit = parseInt(url.searchParams.get('limit') || '50');
-		
+
 		const [topClasses, globalStats] = await Promise.all([
 			getGlobalTopClasses(limit),
 			getGlobalStats()
@@ -19,4 +19,4 @@ export const GET = async ({ url }: RequestEvent) => {
 		console.error('Error fetching global stats:', error);
 		return json({ error: 'Failed to fetch global stats' }, { status: 500 });
 	}
-}
+};

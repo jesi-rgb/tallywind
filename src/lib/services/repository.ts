@@ -1,5 +1,11 @@
 import { db } from '$lib/db';
-import { repositories, tailwindClasses, type Repository, type NewRepository, type NewTailwindClass } from '$lib/db/schema';
+import {
+	repositories,
+	tailwindClasses,
+	type Repository,
+	type NewRepository,
+	type NewTailwindClass
+} from '$lib/db/schema';
 import * as github from '$lib/github';
 import { countTailwindClasses, shouldParseFile } from '$lib/tailwind-parser';
 import { eq, sql } from 'drizzle-orm';
@@ -18,9 +24,6 @@ export type TailwindStats = {
 		currentFile?: string;
 	};
 };
-
-
-
 
 // Analyze a GitHub repository and save the results to the database
 export async function analyzeRepository(repoUrl: string): Promise<TailwindStats | null> {
@@ -52,7 +55,11 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 			}
 
 			// Check repository eligibility
-			const eligibility = await github.checkRepositoryEligibility(owner, repo, githubRepo.default_branch);
+			const eligibility = await github.checkRepositoryEligibility(
+				owner,
+				repo,
+				githubRepo.default_branch
+			);
 
 			if (!eligibility.isEligible) {
 				// Create repository record with eligibility info but don't analyze
@@ -111,7 +118,8 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 		}
 
 		// Update repo status to processing
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({ status: 'processing', analyzed_at: new Date() })
 			.where(eq(repositories.id, repoRecord.id));
 
@@ -120,10 +128,11 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 		const files = await github.getAllFiles(owner, repo, defaultBranch);
 
 		// Filter files that are eligible for Tailwind analysis
-		const eligibleFiles = files.filter(file => shouldParseFile(file.path));
+		const eligibleFiles = files.filter((file) => shouldParseFile(file.path));
 
 		// Update database with file counts
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({
 				total_files: eligibleFiles.length,
 				processed_files: 0
@@ -146,7 +155,8 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 			filesProcessed++;
 
 			// Update database progress
-			await db.update(repositories)
+			await db
+				.update(repositories)
 				.set({ processed_files: filesProcessed })
 				.where(eq(repositories.id, repoRecord.id));
 		}
@@ -158,11 +168,13 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 		await db.delete(tailwindClasses).where(eq(tailwindClasses.repo_id, repoRecord.id));
 
 		// Insert new class counts
-		const classRows: NewTailwindClass[] = Object.entries(classCounts).map(([class_name, count]) => ({
-			repo_id: repoRecord.id,
-			class_name,
-			count
-		}));
+		const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
+			([class_name, count]) => ({
+				repo_id: repoRecord.id,
+				class_name,
+				count
+			})
+		);
 
 		// Batch insert class counts
 		if (classRows.length > 0) {
@@ -178,7 +190,8 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 		const totalClasses = Object.values(classCounts).reduce((sum, count) => sum + count, 0);
 
 		// Update repo status to completed
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({
 				status: 'completed',
 				analyzed_at: new Date(),
@@ -204,10 +217,7 @@ export async function getRepositoryByUrl(url: string): Promise<Repository | null
 	if (!db) return null;
 
 	try {
-		const [repo] = await db
-			.select()
-			.from(repositories)
-			.where(eq(repositories.url, url));
+		const [repo] = await db.select().from(repositories).where(eq(repositories.url, url));
 
 		return repo || null;
 	} catch (error) {
@@ -239,7 +249,9 @@ export async function getClassCountsForRepo(repoId: number): Promise<Record<stri
 }
 
 // Get global top Tailwind classes
-export async function getGlobalTopClasses(limit: number = 50): Promise<Array<{ className: string; count: number }>> {
+export async function getGlobalTopClasses(
+	limit: number = 50
+): Promise<Array<{ className: string; count: number }>> {
 	if (!db) return [];
 
 	try {
@@ -260,6 +272,39 @@ export async function getGlobalTopClasses(limit: number = 50): Promise<Array<{ c
 	}
 }
 
+// Get the longest Tailwind class name
+export async function getLongestClassName(): Promise<{
+	className: string;
+	length: number;
+	count: number;
+} | null> {
+	if (!db) return null;
+
+	try {
+		const result = await db.execute(sql`
+			SELECT 
+				class_name as className,
+				LENGTH(class_name) as length,
+				SUM(count) as count
+			FROM tailwind_classes 
+			ORDER BY LENGTH(class_name) DESC, SUM(count) DESC
+			LIMIT 1
+		`);
+
+		const data = result[0] as any;
+		if (!data) return null;
+
+		return {
+			className: data.classname,
+			length: parseInt(data.length),
+			count: parseInt(data.count)
+		};
+	} catch (error) {
+		console.error('Error getting longest class name:', error);
+		return null;
+	}
+}
+
 // Get global statistics
 export async function getGlobalStats(): Promise<{
 	totalRepos: number;
@@ -268,13 +313,14 @@ export async function getGlobalStats(): Promise<{
 	eligibleRepos: number;
 	reposWithTailwind: number;
 }> {
-	if (!db) return {
-		totalRepos: 0,
-		totalClasses: 0,
-		uniqueClasses: 0,
-		eligibleRepos: 0,
-		reposWithTailwind: 0
-	};
+	if (!db)
+		return {
+			totalRepos: 0,
+			totalClasses: 0,
+			uniqueClasses: 0,
+			eligibleRepos: 0,
+			reposWithTailwind: 0
+		};
 
 	try {
 		const [repoStats, classStats] = await Promise.all([
@@ -336,7 +382,10 @@ function formatTailwindStats(repo: Repository, classCounts: Record<string, numbe
 }
 
 // SSE version of analyzeRepository that emits progress events
-export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmitter): Promise<void> {
+export async function analyzeRepositoryWithSSE(
+	repoUrl: string,
+	emitter: SSEEmitter
+): Promise<void> {
 	if (!db) {
 		console.error('Database is not available');
 		emitter.emit({ type: 'error', data: { message: 'Database is not available' } });
@@ -371,7 +420,10 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 			const githubRepo = await github.getRepository(owner, repo);
 			if (!githubRepo) {
 				console.error('Could not fetch repository from GitHub:', repoUrl);
-				emitter.emit({ type: 'error', data: { message: 'Could not fetch repository from GitHub' } });
+				emitter.emit({
+					type: 'error',
+					data: { message: 'Could not fetch repository from GitHub' }
+				});
 				emitter.close();
 				return;
 			}
@@ -381,8 +433,12 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 				type: 'progress',
 				data: { status: 'fetching', currentFile: 'Checking eligibility' }
 			});
-			
-			const eligibility = await github.checkRepositoryEligibility(owner, repo, githubRepo.default_branch);
+
+			const eligibility = await github.checkRepositoryEligibility(
+				owner,
+				repo,
+				githubRepo.default_branch
+			);
 
 			if (!eligibility.isEligible) {
 				// Create repository record with eligibility info but don't analyze
@@ -400,9 +456,9 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 				};
 
 				await db.insert(repositories).values(newRepo).returning();
-				emitter.emit({ 
-					type: 'error', 
-					data: { message: eligibility.reason || 'Repository is not eligible for analysis' } 
+				emitter.emit({
+					type: 'error',
+					data: { message: eligibility.reason || 'Repository is not eligible for analysis' }
 				});
 				emitter.close();
 				return;
@@ -428,7 +484,10 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 
 		if (!repoRecord) {
 			console.error('Failed to create or retrieve repository record');
-			emitter.emit({ type: 'error', data: { message: 'Failed to create or retrieve repository record' } });
+			emitter.emit({
+				type: 'error',
+				data: { message: 'Failed to create or retrieve repository record' }
+			});
 			emitter.close();
 			return;
 		}
@@ -444,7 +503,7 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 				// Return cached results
 				const classCounts = await getClassCountsForRepo(repoRecord.id);
 				const stats = formatTailwindStats(repoRecord, classCounts);
-				
+
 				emitter.emit({
 					type: 'completed',
 					data: {
@@ -460,7 +519,8 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 		}
 
 		// Update repo status to processing
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({ status: 'processing', analyzed_at: new Date() })
 			.where(eq(repositories.id, repoRecord.id));
 
@@ -469,15 +529,16 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 			type: 'progress',
 			data: { status: 'fetching', currentFile: 'File list', repoId: repoRecord.id }
 		});
-		
+
 		const defaultBranch = repoRecord.default_branch || 'main';
 		const files = await github.getAllFiles(owner, repo, defaultBranch);
 
 		// Filter files that are eligible for Tailwind analysis
-		const eligibleFiles = files.filter(file => shouldParseFile(file.path));
+		const eligibleFiles = files.filter((file) => shouldParseFile(file.path));
 
 		// Update database with file counts
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({
 				total_files: eligibleFiles.length,
 				processed_files: 0
@@ -521,7 +582,8 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 			filesProcessed++;
 
 			// Update database progress
-			await db.update(repositories)
+			await db
+				.update(repositories)
 				.set({ processed_files: filesProcessed })
 				.where(eq(repositories.id, repoRecord.id));
 
@@ -540,33 +602,35 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 		// Count Tailwind classes
 		emitter.emit({
 			type: 'progress',
-			data: { 
-				status: 'analyzing', 
+			data: {
+				status: 'analyzing',
 				currentFile: 'Counting Tailwind classes',
 				repoId: repoRecord.id
 			}
 		});
-		
+
 		const classCounts = countTailwindClasses(filesToProcess);
 
 		// Delete any existing class counts for this repo
 		emitter.emit({
 			type: 'progress',
-			data: { 
-				status: 'saving', 
+			data: {
+				status: 'saving',
 				currentFile: 'Saving to database',
 				repoId: repoRecord.id
 			}
 		});
-		
+
 		await db.delete(tailwindClasses).where(eq(tailwindClasses.repo_id, repoRecord.id));
 
 		// Insert new class counts
-		const classRows: NewTailwindClass[] = Object.entries(classCounts).map(([class_name, count]) => ({
-			repo_id: repoRecord.id,
-			class_name,
-			count
-		}));
+		const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
+			([class_name, count]) => ({
+				repo_id: repoRecord.id,
+				class_name,
+				count
+			})
+		);
 
 		// Batch insert class counts
 		if (classRows.length > 0) {
@@ -575,7 +639,7 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 			for (let i = 0; i < classRows.length; i += BATCH_SIZE) {
 				const batch = classRows.slice(i, i + BATCH_SIZE);
 				await db.insert(tailwindClasses).values(batch);
-				
+
 				emitter.emit({
 					type: 'progress',
 					data: {
@@ -591,7 +655,8 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 		const totalClasses = Object.values(classCounts).reduce((sum, count) => sum + count, 0);
 
 		// Update repo status to completed
-		await db.update(repositories)
+		await db
+			.update(repositories)
 			.set({
 				status: 'completed',
 				analyzed_at: new Date(),
@@ -621,9 +686,9 @@ export async function analyzeRepositoryWithSSE(repoUrl: string, emitter: SSEEmit
 		emitter.close();
 	} catch (error) {
 		console.error('Error analyzing repository:', error);
-		emitter.emit({ 
-			type: 'error', 
-			data: { message: `Error analyzing repository: ${error}` } 
+		emitter.emit({
+			type: 'error',
+			data: { message: `Error analyzing repository: ${error}` }
 		});
 		emitter.close();
 	}

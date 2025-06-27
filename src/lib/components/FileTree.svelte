@@ -104,24 +104,24 @@
 	<div class="flex items-center py-1" style="padding-left: {level * 1.5}rem">
 		{#if node.isDirectory}
 			<button
-				class="btn btn-ghost btn-xs mr-1 p-0 min-h-0 h-4 w-4"
+				class="btn btn-ghost btn-xs mr-1 h-4 min-h-0 w-4 p-0"
 				onclick={() => toggleExpanded(node)}
 			>
 				{node.expanded ? '📂' : '📁'}
 			</button>
-			<span class="font-medium text-base-content/80">{node.name}</span>
+			<span class="text-base-content/80 font-medium">{node.name}</span>
 		{:else if node.file}
 			<span class="mr-2 text-xs">{getStatusIcon(node.file.status)}</span>
 			<span class="font-mono text-xs {getStatusColor(node.file.status)}">
 				{node.name}
 			</span>
 			{#if node.file.classesFound !== undefined}
-				<span class="ml-auto badge badge-primary badge-xs">
+				<span class="badge badge-primary badge-xs ml-auto">
 					{node.file.classesFound} classes
 				</span>
 			{/if}
 			{#if node.file.size !== undefined}
-				<span class="ml-2 text-xs text-base-content/50">
+				<span class="text-base-content/50 ml-2 text-xs">
 					{(node.file.size / 1024).toFixed(1)}KB
 				</span>
 			{/if}
@@ -137,6 +137,7 @@
 
 <style>
 	.file-tree {
-		font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+		font-family:
+			'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 	}
 </style>

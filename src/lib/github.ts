@@ -18,12 +18,18 @@ type GitHubRepo = {
 	default_branch: string;
 };
 
+type RateLimitInfo = {
+	remaining: number;
+	reset: number;
+	retryAfter?: number;
+};
+
 // Extract owner and repo name from GitHub URL
 export function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
 	// Handle different GitHub URL formats
 	const patterns = [
-		/github\.com\/([^/]+)\/([^/]+)\/?$/,  // github.com/owner/repo
-		/github\.com\/([^/]+)\/([^/]+)\//     // github.com/owner/repo/anything
+		/github\.com\/([^/]+)\/([^/]+)\/?$/, // github.com/owner/repo
+		/github\.com\/([^/]+)\/([^/]+)\// // github.com/owner/repo/anything
 	];
 
 	for (const pattern of patterns) {
@@ -39,10 +45,47 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string } | n
 	return null;
 }
 
-// API request helper with auth
-async function githubFetch(url: string) {
+// Rate limit helper functions
+function parseRateLimitHeaders(response: Response): RateLimitInfo {
+	const remaining = parseInt(response.headers.get('x-ratelimit-remaining') || '0');
+	const reset = parseInt(response.headers.get('x-ratelimit-reset') || '0');
+	const retryAfter = response.headers.get('retry-after');
+
+	return {
+		remaining,
+		reset,
+		retryAfter: retryAfter ? parseInt(retryAfter) : undefined
+	};
+}
+
+function calculateDelayMs(rateLimitInfo: RateLimitInfo): number {
+	// If we have a retry-after header, use that
+	if (rateLimitInfo.retryAfter) {
+		return rateLimitInfo.retryAfter * 1000;
+	}
+
+	// If we're close to the rate limit, add a small delay
+	if (rateLimitInfo.remaining <= 10) {
+		const now = Math.floor(Date.now() / 1000);
+		const resetIn = rateLimitInfo.reset - now;
+
+		// If reset is soon, wait for it
+		if (resetIn > 0 && resetIn <= 60) {
+			return resetIn * 1000;
+		}
+
+		// Otherwise add a small delay to avoid hitting the limit
+		return 1000;
+	}
+
+	// No delay needed
+	return 0;
+}
+
+// API request helper with auth and rate limiting
+async function githubFetch(url: string): Promise<Response> {
 	const headers: HeadersInit = {
-		'Accept': 'application/vnd.github.v3+json',
+		Accept: 'application/vnd.github.v3+json',
 		'User-Agent': 'TallywindApp'
 	};
 
@@ -51,9 +94,33 @@ async function githubFetch(url: string) {
 		headers['Authorization'] = `token ${env.GITHUB_TOKEN}`;
 	}
 
-	return fetch(url, { headers });
+	const response = await fetch(url, { headers });
+
+	// Handle rate limiting
+	if (response.status === 403 || response.status === 429) {
+		const rateLimitInfo = parseRateLimitHeaders(response);
+		const delayMs = calculateDelayMs(rateLimitInfo);
+
+		if (delayMs > 0) {
+			console.log(`Rate limited. Waiting ${delayMs}ms before retry...`);
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+			// Retry the request once
+			return fetch(url, { headers });
+		}
+	}
+
+	return response;
 }
 
+// Smart delay function that checks rate limit headers
+async function smartDelay(response: Response): Promise<void> {
+	const rateLimitInfo = parseRateLimitHeaders(response);
+	const delayMs = calculateDelayMs(rateLimitInfo);
+
+	if (delayMs > 0) {
+		await new Promise((resolve) => setTimeout(resolve, delayMs));
+	}
+}
 // Get repository information
 export async function getRepository(owner: string, repo: string): Promise<GitHubRepo | null> {
 	try {
@@ -72,7 +139,11 @@ export async function getRepository(owner: string, repo: string): Promise<GitHub
 }
 
 // Recursively get all files in a repository
-export async function getAllFiles(owner: string, repo: string, branch: string): Promise<GitHubFile[]> {
+export async function getAllFiles(
+	owner: string,
+	repo: string,
+	branch: string
+): Promise<GitHubFile[]> {
 	try {
 		let allFiles: GitHubFile[] = [];
 		const queue: { path: string }[] = [{ path: '' }];
@@ -100,8 +171,8 @@ export async function getAllFiles(owner: string, repo: string, branch: string): 
 				}
 			}
 
-			// Rate limit handling
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Smart rate limit handling
+			await smartDelay(response);
 		}
 
 		return allFiles;
@@ -130,7 +201,11 @@ export async function getFileContent(fileUrl: string): Promise<string | null> {
 }
 
 // Check if repository is eligible for Tailwind analysis
-export async function checkRepositoryEligibility(owner: string, repo: string, branch: string): Promise<{
+export async function checkRepositoryEligibility(
+	owner: string,
+	repo: string,
+	branch: string
+): Promise<{
 	isEligible: boolean;
 	hasTailwind: boolean;
 	packageJsonExists: boolean;
@@ -140,7 +215,7 @@ export async function checkRepositoryEligibility(owner: string, repo: string, br
 		// First, check if package.json exists
 		const packageJsonUrl = `https://api.github.com/repos/${owner}/${repo}/contents/package.json?ref=${branch}`;
 		const packageResponse = await githubFetch(packageJsonUrl);
-		
+
 		if (!packageResponse.ok) {
 			return {
 				isEligible: false,
@@ -153,7 +228,7 @@ export async function checkRepositoryEligibility(owner: string, repo: string, br
 		// Get package.json content
 		const packageData = await packageResponse.json();
 		const packageContent = atob(packageData.content);
-		
+
 		let packageJson;
 		try {
 			packageJson = JSON.parse(packageContent);
@@ -169,9 +244,9 @@ export async function checkRepositoryEligibility(owner: string, repo: string, br
 		// Check for Tailwind CSS in dependencies or devDependencies
 		const dependencies = packageJson.dependencies || {};
 		const devDependencies = packageJson.devDependencies || {};
-		
-		const hasTailwind = 
-			'tailwindcss' in dependencies || 
+
+		const hasTailwind =
+			'tailwindcss' in dependencies ||
 			'tailwindcss' in devDependencies ||
 			'@tailwindcss/cli' in dependencies ||
 			'@tailwindcss/cli' in devDependencies;
@@ -190,7 +265,6 @@ export async function checkRepositoryEligibility(owner: string, repo: string, br
 			hasTailwind: true,
 			packageJsonExists: true
 		};
-
 	} catch (error) {
 		console.error('Error checking repository eligibility:', error);
 		return {

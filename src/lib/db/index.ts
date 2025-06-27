@@ -17,7 +17,7 @@ export async function isDatabaseAvailable(): Promise<boolean> {
 	if (!db || !client) {
 		return false;
 	}
-	
+
 	try {
 		// Try a simple query to check database connectivity
 		await client`SELECT 1`;
