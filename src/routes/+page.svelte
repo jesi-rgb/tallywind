@@ -57,7 +57,7 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ repoUrl })
+				body: JSON.stringify({ repoUrl: repoUrl.trim() })
 			});
 
 			if (!response.ok) {
@@ -247,16 +247,6 @@
 							<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
 							<div class="text-3xl font-bold">{repoStats.total}</div>
 						</div>
-					</div>
-
-					<div class="border-border border p-4 text-center">
-						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
-						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
-					</div>
-
-					<div class="border-border border p-4 text-center">
-						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
-						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
 					</div>
 
 					<div class="border-border border p-4 text-center">
