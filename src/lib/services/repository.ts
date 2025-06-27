@@ -8,7 +8,7 @@ import {
 } from '$lib/db/schema';
 import * as github from '$lib/github';
 import { countTailwindClasses, shouldParseFile } from '$lib/tailwind-parser';
-import { eq, sql } from 'drizzle-orm';
+import { count, eq, sql, sum } from 'drizzle-orm';
 import { SSEEmitter } from '$lib/sse';
 
 export type TailwindStats = {
@@ -311,6 +311,7 @@ export async function getGlobalStats(): Promise<{
 	totalClasses: number;
 	uniqueClasses: number;
 	eligibleRepos: number;
+	numberOfFiles: number;
 	reposWithTailwind: number;
 }> {
 	if (!db)
@@ -318,6 +319,7 @@ export async function getGlobalStats(): Promise<{
 			totalRepos: 0,
 			totalClasses: 0,
 			uniqueClasses: 0,
+			numberOfFiles: 0,
 			eligibleRepos: 0,
 			reposWithTailwind: 0
 		};
@@ -332,7 +334,8 @@ export async function getGlobalStats(): Promise<{
 					SUM(total_classes) as total_classes
 				FROM repositories
 			`),
-			db.execute(sql`
+			db.select({ count: count() }).from(repositories).where(eq(repositories.has_tailwind, true)).
+				db.execute(sql`
 				SELECT 
 					COUNT(DISTINCT class_name) as unique_classes
 				FROM tailwind_classes
@@ -499,7 +502,7 @@ export async function analyzeRepositoryWithSSE(
 			const now = new Date();
 			const hoursSinceLastUpdate = (now.getTime() - lastAnalyzed.getTime()) / (1000 * 60 * 60);
 
-			if (hoursSinceLastUpdate < 24) {
+			if (hoursSinceLastUpdate < 48) {
 				// Return cached results
 				const classCounts = await getClassCountsForRepo(repoRecord.id);
 				const stats = formatTailwindStats(repoRecord, classCounts);
@@ -508,6 +511,8 @@ export async function analyzeRepositoryWithSSE(
 					type: 'completed',
 					data: {
 						repoId: repoRecord.id,
+						repoOwner: repoRecord.owner,
+						repoName: repoRecord.name,
 						totalClasses: stats.total,
 						topClasses: stats.topClasses,
 						classCounts: stats.classCounts

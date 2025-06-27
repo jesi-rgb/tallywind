@@ -9,6 +9,8 @@
 	let globalStats = $state<Array<{ className: string; count: number }>>([]);
 	let showGlobalStats = $state(false);
 
+	$inspect(repoStats);
+
 	// Progress state for SSE
 	let progress = $state<{
 		repoUrl: string;
@@ -110,7 +112,7 @@
 								}
 							} else if (currentEventType === 'completed') {
 								repoStats = {
-									repo: { id: data.repoId, owner: '', name: '' } as any,
+									repo: { id: data.repoId, owner: data.repoOwner, name: data.repoName } as any,
 									classCounts: data.classCounts,
 									total: data.totalClasses,
 									topClasses: data.topClasses,
@@ -138,128 +140,49 @@
 </script>
 
 <main class="border-base-content flex h-screen flex-col overflow-hidden border-2">
-	<!-- Header Grid -->
-	<div class="border-base-content grid flex-shrink-0 grid-cols-1 border-b-2 md:grid-cols-3">
-		<!-- Title Section -->
-		<div class="border-base-content border-r-2 p-6 md:col-span-2">
+	<!-- Header -->
+	<div class="border-base-content flex flex-shrink-0 items-center justify-between border-b-2 p-6">
+		<div>
 			<h1 class="text-4xl font-bold tracking-wider uppercase">TALLYWIND</h1>
 			<p class="mt-2 font-mono text-lg">TAILWIND CLASS COUNTER & ANALYZER</p>
 		</div>
-
-		<!-- Navigation -->
-		<div class="border-base-content flex items-center justify-center p-6">
-			<a
-				href="/global"
-				class="border-base-content hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
-			>
-				GLOBAL STATS
-			</a>
-		</div>
+		<a
+			href="/global"
+			class="border-base-content hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
+		>
+			GLOBAL STATS
+		</a>
 	</div>
 
-	<!-- Main Content Grid -->
-	<div class="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-2">
-		<!-- Left Column: Description & Features -->
-		<div class="border-base-content flex flex-col border-r-2">
-			<!-- Description -->
-			<div class="border-base-content flex-shrink-0 border-b-2 p-6">
-				<h2 class="mb-4 text-xl font-bold uppercase">DISCOVER HIDDEN PATTERNS</h2>
-				<p class="font-mono leading-relaxed">
-					Analyze GitHub repositories to count and categorize every Tailwind CSS class. Reveal
-					insights about your design system usage and optimize your styling approach.
-				</p>
+	<!-- Main Content -->
+	<div class="flex flex-1 flex-col items-center justify-center p-6">
+		<div class="w-full max-w-md space-y-4">
+			<div>
+				<label class="mb-2 block font-mono text-sm uppercase" for="repo-url">
+					GITHUB REPOSITORY URL
+				</label>
+				<input
+					bind:value={repoUrl}
+					type="text"
+					id="repo-url"
+					placeholder="https://github.com/username/repo"
+					class="border-base-content focus:bg-base-200 w-full border-2 bg-transparent p-3 font-mono transition-colors"
+				/>
 			</div>
 
-			<!-- Features Grid -->
-			<div class="flex flex-1 flex-col">
-				<div class="border-base-content flex flex-1 items-center border-b-2 p-6">
-					<div class="flex w-full items-start gap-4">
-						<div class="text-2xl">📊</div>
-						<div>
-							<h3 class="font-bold uppercase">USAGE STATISTICS</h3>
-							<p class="mt-1 font-mono text-sm">
-								Detailed breakdowns of class frequency and most-used utilities
-							</p>
-						</div>
-					</div>
+			<button
+				class="border-base-content hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+				onclick={handleAnalyze}
+				disabled={isAnalyzing}
+			>
+				{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
+			</button>
+
+			{#if error}
+				<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">
+					ERROR: {error}
 				</div>
-
-				<div class="border-base-content flex flex-1 items-center border-b-2 p-6">
-					<div class="flex w-full items-start gap-4">
-						<div class="text-2xl">🎨</div>
-						<div>
-							<h3 class="font-bold uppercase">DESIGN PATTERNS</h3>
-							<p class="mt-1 font-mono text-sm">
-								Identify common styling patterns and component opportunities
-							</p>
-						</div>
-					</div>
-				</div>
-
-				<div class="flex flex-1 items-center p-6">
-					<div class="flex w-full items-start gap-4">
-						<div class="text-2xl">⚡</div>
-						<div>
-							<h3 class="font-bold uppercase">OPTIMIZATION INSIGHTS</h3>
-							<p class="mt-1 font-mono text-sm">Spot unused classes and optimize CSS bundle size</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- Right Column: Analysis Form -->
-		<div class="flex flex-col">
-			<div class="border-base-content flex-shrink-0 border-b-2 p-6">
-				<h2 class="mb-4 text-xl font-bold uppercase">ANALYZE REPOSITORY</h2>
-
-				<div class="space-y-4">
-					<div>
-						<label class="mb-2 block font-mono text-sm uppercase" for="repo-url">
-							GITHUB REPOSITORY URL
-						</label>
-						<input
-							bind:value={repoUrl}
-							type="text"
-							id="repo-url"
-							placeholder="https://github.com/username/repo"
-							class="border-base-content focus:bg-base-200 w-full border-2 bg-transparent p-3 font-mono transition-colors"
-						/>
-					</div>
-
-					<button
-						class="border-base-content hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-						onclick={handleAnalyze}
-						disabled={isAnalyzing}
-					>
-						{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
-					</button>
-
-					{#if error}
-						<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">
-							ERROR: {error}
-						</div>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Status Badges -->
-			<div class="flex flex-1 items-center justify-center p-6">
-				<div class="grid w-full grid-cols-1 gap-0">
-					<div class="border-base-content border-2 p-4 text-center">
-						<div class="mb-1 font-mono text-sm uppercase">CLASS</div>
-						<div class="font-mono text-sm uppercase">ANALYTICS</div>
-					</div>
-					<div class="border-base-content border-2 border-t-0 p-4 text-center">
-						<div class="mb-1 font-mono text-sm uppercase">PATTERN</div>
-						<div class="font-mono text-sm uppercase">DISCOVERY</div>
-					</div>
-					<div class="border-base-content border-2 border-t-0 p-4 text-center">
-						<div class="mb-1 font-mono text-sm uppercase">REAL-TIME</div>
-						<div class="font-mono text-sm uppercase">ANALYSIS</div>
-					</div>
-				</div>
-			</div>
+			{/if}
 		</div>
 	</div>
 
@@ -308,7 +231,7 @@
 		<div class="border-base-content border-t-2">
 			<!-- Results Header -->
 			<div class="border-base-content border-b-2 p-6">
-				<h2 class="text-xl font-bold uppercase">
+				<h2 class="text-xl font-bold">
 					RESULTS: {repoStats.repo.owner}/{repoStats.repo.name}
 				</h2>
 			</div>
@@ -331,9 +254,9 @@
 			</div>
 
 			<!-- Top Classes -->
-			<div class="border-base-content border-t-2 p-6">
+			<div class="border-base-content h-full border-t-2 p-6">
 				<h3 class="mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
-				<div class="grid grid-cols-1 gap-0">
+				<div class="grid h-1/2 grid-cols-1 gap-0 overflow-y-scroll">
 					{#each repoStats.topClasses as { className, count }, index}
 						<div
 							class="border-2 {index > 0
