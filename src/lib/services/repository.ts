@@ -276,20 +276,27 @@ export async function getGlobalTopClasses(
 export async function getLongestClassName(): Promise<{
 	className: string;
 	length: number;
-	count: number;
+	repo: {
+		owner: string;
+		name: string;
+	}
 } | null> {
 	if (!db) return null;
 
 	try {
-		const result = await db.execute(sql`
-			SELECT 
-				class_name as className,
-				LENGTH(class_name) as length,
-				SUM(count) as count
-			FROM tailwind_classes 
-			ORDER BY LENGTH(class_name) DESC, SUM(count) DESC
-			LIMIT 1
-		`);
+		const result = await db
+			.select({
+				classname: tailwindClasses.class_name,
+				repo_id: tailwindClasses.repo_id,
+				length: sql<number>`LENGTH(${tailwindClasses.class_name})`.as('length'),
+				owner: repositories.owner,
+				name: repositories.name
+			})
+			.from(tailwindClasses)
+			.innerJoin(repositories, eq(tailwindClasses.repo_id, repositories.id))
+			.orderBy(sql`LENGTH(${tailwindClasses.class_name}) DESC`)
+			.limit(1);
+
 
 		const data = result[0] as any;
 		if (!data) return null;
@@ -297,7 +304,10 @@ export async function getLongestClassName(): Promise<{
 		return {
 			className: data.classname,
 			length: parseInt(data.length),
-			count: parseInt(data.count)
+			repo: {
+				owner: result[0].owner,
+				name: result[0].name,
+			}
 		};
 	} catch (error) {
 		console.error('Error getting longest class name:', error);
@@ -310,22 +320,18 @@ export async function getGlobalStats(): Promise<{
 	totalRepos: number;
 	totalClasses: number;
 	uniqueClasses: number;
-	eligibleRepos: number;
-	numberOfFiles: number;
-	reposWithTailwind: number;
+	totalFiles: number;
 }> {
 	if (!db)
 		return {
 			totalRepos: 0,
 			totalClasses: 0,
 			uniqueClasses: 0,
-			numberOfFiles: 0,
-			eligibleRepos: 0,
-			reposWithTailwind: 0
+			totalFiles: 0
 		};
 
 	try {
-		const [repoStats, classStats] = await Promise.all([
+		const [repoStats, classStats, filesStats] = await Promise.all([
 			db.execute(sql`
 				SELECT 
 					COUNT(*) as total_repos,
@@ -334,23 +340,24 @@ export async function getGlobalStats(): Promise<{
 					SUM(total_classes) as total_classes
 				FROM repositories
 			`),
-			db.select({ count: count() }).from(repositories).where(eq(repositories.has_tailwind, true)).
-				db.execute(sql`
+			db.execute(sql`
 				SELECT 
 					COUNT(DISTINCT class_name) as unique_classes
 				FROM tailwind_classes
-			`)
+			`),
+			db.select({ totalFiles: sum(repositories.total_files) }).from(repositories)
 		]);
 
 		const repoData = repoStats[0] as any;
 		const classData = classStats[0] as any;
+		const filesData = filesStats[0] as any;
+		console.log(repoData)
 
 		return {
-			totalRepos: parseInt(repoData.total_repos) || 0,
+			totalRepos: parseInt(repoData.repos_with_tailwind) || 0,
 			totalClasses: parseInt(repoData.total_classes) || 0,
 			uniqueClasses: parseInt(classData.unique_classes) || 0,
-			eligibleRepos: parseInt(repoData.eligible_repos) || 0,
-			reposWithTailwind: parseInt(repoData.repos_with_tailwind) || 0
+			totalFiles: parseInt(filesData.totalFiles) || 0,
 		};
 	} catch (error) {
 		console.error('Error getting global stats:', error);

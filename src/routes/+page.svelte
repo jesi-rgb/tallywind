@@ -139,68 +139,70 @@
 	}
 </script>
 
-<main class="border-base-content flex h-screen flex-col overflow-hidden border-2">
+<main class="flex h-screen flex-col overflow-hidden">
 	<!-- Header -->
-	<div class="border-base-content flex flex-shrink-0 items-center justify-between border-b-2 p-6">
+	<div class="border-border flex flex-shrink-0 items-center justify-between border-b-2 p-6">
 		<div>
 			<h1 class="text-4xl font-bold tracking-wider uppercase">TALLYWIND</h1>
 			<p class="mt-2 font-mono text-lg">TAILWIND CLASS COUNTER & ANALYZER</p>
 		</div>
 		<a
 			href="/global"
-			class="border-base-content hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
+			class="border-border hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
 		>
 			GLOBAL STATS
 		</a>
 	</div>
 
 	<!-- Main Content -->
-	<div class="flex flex-1 flex-col items-center justify-center p-6">
-		<div class="w-full max-w-md space-y-4">
-			<div>
-				<label class="mb-2 block font-mono text-sm uppercase" for="repo-url">
-					GITHUB REPOSITORY URL
-				</label>
-				<input
-					bind:value={repoUrl}
-					type="text"
-					id="repo-url"
-					placeholder="https://github.com/username/repo"
-					class="border-base-content focus:bg-base-200 w-full border-2 bg-transparent p-3 font-mono transition-colors"
-				/>
-			</div>
-
-			<button
-				class="border-base-content hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-				onclick={handleAnalyze}
-				disabled={isAnalyzing}
-			>
-				{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
-			</button>
-
-			{#if error}
-				<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">
-					ERROR: {error}
+	{#if !repoStats}
+		<div class="flex flex-1 flex-col items-center justify-center p-6">
+			<form class="w-full max-w-md space-y-4">
+				<div>
+					<label class="mb-2 block font-mono text-sm uppercase" for="repo-url">
+						GITHUB REPOSITORY URL
+					</label>
+					<input
+						bind:value={repoUrl}
+						type="text"
+						id="repo-url"
+						placeholder="https://github.com/username/repo"
+						class="border-border focus:bg-base-200 w-full border-2 bg-transparent p-3 font-mono transition-colors"
+					/>
 				</div>
-			{/if}
+
+				<button
+					class="border-border hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+					onclick={handleAnalyze}
+					disabled={isAnalyzing}
+				>
+					{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
+				</button>
+
+				{#if error}
+					<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">
+						ERROR: {error}
+					</div>
+				{/if}
+			</form>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Progress Display -->
 	{#if progress && isAnalyzing}
-		<div class="border-base-content border-t-2">
-			<div class="border-base-content border-b-2 p-6">
+		<div class="border-border border-t-2">
+			<div class="border-border border-b-2 p-6">
 				<h2 class="mb-4 text-xl font-bold uppercase">ANALYSIS PROGRESS</h2>
 
 				<div class="grid grid-cols-1 gap-0 md:grid-cols-2">
-					<div class="border-base-content border-2 p-4">
+					<div class="border-border border-2 p-4">
 						<div class="mb-2 font-mono text-sm uppercase">STATUS</div>
 						<div class="font-bold uppercase">{progress.status}</div>
 					</div>
 
 					{#if progress.totalFiles && progress.filesProcessed !== undefined}
 						<div
-							class="border-base-content border-2 border-t-0 border-l-0 p-4 md:border-t-2 md:border-l-2"
+							class="border-border border-2 border-t-0 border-l-0 p-4 md:border-t-2 md:border-l-2"
 						>
 							<div class="mb-2 font-mono text-sm uppercase">FILES PROCESSED</div>
 							<div class="font-bold">{progress.filesProcessed} / {progress.totalFiles}</div>
@@ -209,7 +211,7 @@
 				</div>
 
 				{#if progress.totalFiles}
-					<div class="border-base-content mt-4 border-2">
+					<div class="border-border border">
 						<div
 							class="bg-base-content h-4 transition-all duration-300"
 							style="width: {((progress.filesProcessed || 0) / progress.totalFiles) * 100}%"
@@ -218,7 +220,7 @@
 				{/if}
 
 				{#if progress.currentFile}
-					<div class="border-base-content mt-4 border-2 p-3">
+					<div class="border-border border p-3">
 						<div class="mb-1 font-mono text-xs uppercase">CURRENTLY PROCESSING</div>
 						<div class="font-mono text-sm break-all">{progress.currentFile}</div>
 					</div>
@@ -228,53 +230,67 @@
 	{/if}
 
 	{#if repoStats}
-		<div class="border-base-content border-t-2">
+		<div class="border-border overflow-scroll border-t-2">
 			<!-- Results Header -->
-			<div class="border-base-content border-b-2 p-6">
+			<div class="border-border border-b-2 p-6">
 				<h2 class="text-xl font-bold">
 					RESULTS: {repoStats.repo.owner}/{repoStats.repo.name}
 				</h2>
 			</div>
 
 			<!-- Stats Grid -->
-			<div class="grid grid-cols-1 md:grid-cols-2">
-				<div class="border-base-content border-r-2 p-6">
-					<div class="border-base-content border-2 p-4 text-center">
-						<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
-						<div class="text-3xl font-bold">{repoStats.total}</div>
+			<div class="flex overflow-scroll">
+				<div class="flex h-full w-1/2 flex-col p-6">
+					<h3 class="mb-4 font-bold uppercase">Repo Stats</h3>
+					<div class="border-border border">
+						<div class="border-border p-4 text-center">
+							<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
+							<div class="text-3xl font-bold">{repoStats.total}</div>
+						</div>
 					</div>
-				</div>
 
-				<div class="p-6">
-					<div class="border-base-content border-2 p-4 text-center">
+					<div class="border-border border p-4 text-center">
+						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
+						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
+					</div>
+
+					<div class="border-border border p-4 text-center">
+						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
+						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
+					</div>
+
+					<div class="border-border border p-4 text-center">
 						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
 						<div class="text-3xl font-bold">{Object.keys(repoStats.classCounts).length}</div>
 					</div>
 				</div>
-			</div>
 
-			<!-- Top Classes -->
-			<div class="border-base-content h-full border-t-2 p-6">
-				<h3 class="mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
-				<div class="grid h-1/2 grid-cols-1 gap-0 overflow-y-scroll">
-					{#each repoStats.topClasses as { className, count }, index}
-						<div
-							class="border-2 {index > 0
-								? 'border-t-0'
-								: ''} border-base-content flex items-center justify-between p-3"
-						>
-							<div class="font-mono">{className}</div>
-							<div class="border-base-content border px-2 py-1 font-mono text-sm">{count}</div>
-						</div>
-					{/each}
+				<!-- Top Classes -->
+				<div
+					class="border-border h-[500px] w-1/2
+					overflow-y-scroll p-6"
+				>
+					<h3 class="mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
+					<div class="grid h-1/3 grid-cols-1 gap-0">
+						{#each repoStats.topClasses as { className, count }, index}
+							<div
+								class="border-2 {index > 0
+									? 'border-t-0'
+									: ''} border-border flex items-center justify-between p-3"
+							>
+								<div class="font-mono">{className}</div>
+								<div class="border-border border px-2 py-1 font-mono text-sm">{count}</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			</div>
 
 			<!-- All Classes Toggle -->
-			<div class="border-base-content border-t-2">
+			<div class="border-border border-t-2">
 				<details class="group">
 					<summary
-						class="border-base-content hover:bg-base-200 cursor-pointer border-b-2 p-6 font-bold uppercase transition-colors"
+						class="border-border hover:bg-base-200 cursor-pointer border-b-2 p-6 font-bold uppercase transition-colors"
 					>
 						SHOW ALL CLASSES
 					</summary>
@@ -284,10 +300,10 @@
 								<div
 									class="border-2 {index > 0
 										? 'border-t-0'
-										: ''} border-base-content flex items-center justify-between p-2"
+										: ''} border-border flex items-center justify-between p-2"
 								>
 									<div class="font-mono text-sm">{className}</div>
-									<div class="border-base-content border px-2 py-1 font-mono text-xs">{count}</div>
+									<div class="border-border border px-2 py-1 font-mono text-xs">{count}</div>
 								</div>
 							{/each}
 						</div>
@@ -297,3 +313,9 @@
 		</div>
 	{/if}
 </main>
+
+<style>
+	input {
+		outline: none;
+	}
+</style>

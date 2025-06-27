@@ -24,6 +24,21 @@
 	let error = $state('');
 	let limit = $state(50);
 	let selectedView = $state<'grid' | 'list' | 'chart'>('grid');
+	let longestClassName = $state<{
+		className: string;
+		length: number;
+		repo: {
+			owner: string;
+			name: string;
+		};
+	}>({
+		className: '',
+		length: 0,
+		repo: {
+			owner: '',
+			name: ''
+		}
+	});
 
 	async function fetchGlobalData() {
 		loading = true;
@@ -44,8 +59,28 @@
 		}
 	}
 
+	async function fetchLongestClass() {
+		loading = true;
+		error = '';
+
+		try {
+			const response = await fetch(`/api/longest-class`);
+			if (!response.ok) {
+				throw new Error('Failed to fetch global data');
+			}
+			const json = await response.json();
+			longestClassName = json;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+			console.error('Error fetching global data:', err);
+		} finally {
+			loading = false;
+		}
+	}
+
 	onMount(() => {
 		fetchGlobalData();
+		fetchLongestClass();
 	});
 
 	function handleLimitChange() {
@@ -65,9 +100,9 @@
 	/>
 </svelte:head>
 
-<main class="border-base-content flex h-screen flex-col overflow-hidden border-2">
+<main class="flex h-screen flex-col overflow-hidden">
 	<!-- Header -->
-	<div class="border-base-content flex-shrink-0 border-b-2 p-6">
+	<div class="border-border flex-shrink-0 border-b-2 p-6">
 		<div class="flex items-center justify-between">
 			<div>
 				<h1 class="text-4xl font-bold uppercase">GLOBAL DASHBOARD</h1>
@@ -75,7 +110,7 @@
 			</div>
 			<a
 				href="/"
-				class="border-base-content hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
+				class="border-border hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
 			>
 				← BACK TO ANALYZER
 			</a>
@@ -88,7 +123,7 @@
 				<div class="mb-4 font-mono text-xl uppercase">ERROR</div>
 				<div class="font-mono text-sm">{error}</div>
 				<button
-					class="border-base-content hover:bg-base-content hover:text-base-100 mt-4 border-2 px-4 py-2 font-mono uppercase transition-colors"
+					class="border-border hover:bg-base-content hover:text-base-100 mt-4 border-2 px-4 py-2 font-mono uppercase transition-colors"
 					onclick={fetchGlobalData}
 				>
 					RETRY
@@ -99,39 +134,61 @@
 		<!-- Dashboard Content -->
 		<div class="flex flex-1 flex-col overflow-hidden">
 			<!-- Stats Grid -->
-			<div class="border-base-content flex-shrink-0 border-b-2">
+			<div class="border-border flex-shrink-0 border-b-2">
 				<div class="grid grid-cols-1 md:grid-cols-4">
-					<div class="border-base-content border-r-2 p-6 text-center">
+					<div class="border-border border-r-2 p-4 text-center">
 						<div class="mb-2 font-mono text-sm uppercase">TOTAL REPOSITORIES</div>
 						<div class="text-3xl font-bold">
-							{globalData.stats.eligibleRepos.toLocaleString()}
+							{globalData.stats.totalRepos.toLocaleString()}
 						</div>
 					</div>
-					<div class="border-base-content border-r-2 p-6 text-center">
+					<div class="border-border border-r-2 p-4 text-center">
 						<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
 						<div class="text-3xl font-bold">{globalData.stats.totalClasses.toLocaleString()}</div>
 					</div>
-					<div class="border-base-content border-r-2 p-6 text-center">
+					<div class="border-border border-r-2 p-4 text-center">
 						<div class="mb-2 font-mono text-sm uppercase">UNIQUE CLASSES</div>
 						<div class="text-3xl font-bold">{globalData.stats.uniqueClasses.toLocaleString()}</div>
 					</div>
-					<div class="p-6 text-center">
-						<div class="mb-2 font-mono text-sm uppercase">WITH TAILWIND</div>
-						<div class="text-3xl font-bold">
-							{globalData.stats.reposWithTailwind.toLocaleString()}
+					<div class="p-4 text-center">
+						<div class="mb-2 font-mono text-sm uppercase">FILES ANALYZED</div>
+						<div
+							class="text-3xl
+							font-bold"
+						>
+							{globalData.stats.totalFiles.toLocaleString()}
 						</div>
 					</div>
 				</div>
 			</div>
 
 			<!-- Controls -->
-			<div class="border-base-content flex-shrink-0 border-b-2 p-6">
+			<div class="border-border flex-shrink-0 border-b-2 p-6">
+				<div class="mb-6 flex w-1/3 items-center gap-3">
+					<div class="shrink-0">
+						Longest class name so far in <a
+							href="https://github.com/{longestClassName.repo.owner}/{longestClassName.repo.name}"
+							target="_blank"
+							class="hover:text-accent font-bold underline"
+							>{longestClassName.repo.owner}/{longestClassName.repo.name}</a
+						>, {longestClassName.length} chars:
+					</div>
+
+					<div class="scroller relative h-full">
+						<div
+							class="w-[400px] overflow-auto pr-5 text-left
+							font-mono whitespace-nowrap"
+						>
+							{longestClassName.className}
+						</div>
+					</div>
+				</div>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-4">
 						<div class="font-mono text-sm uppercase">VIEW:</div>
 						<div class="grid grid-cols-3 gap-0">
 							<button
-								class="border-base-content border-2 px-3 py-1 font-mono text-xs uppercase transition-colors {selectedView ===
+								class="border-border border-2 px-3 py-1 font-mono text-xs uppercase transition-colors {selectedView ===
 								'grid'
 									? 'btn btn-primary border-primary-content'
 									: 'hover:bg-base-200'}"
@@ -140,7 +197,7 @@
 								GRID
 							</button>
 							<button
-								class="border-base-content border-2 border-l-0 px-3 py-1 font-mono text-xs uppercase transition-colors {selectedView ===
+								class="border-border border-2 border-l-0 px-3 py-1 font-mono text-xs uppercase transition-colors {selectedView ===
 								'chart'
 									? 'btn btn-primary border-primary-content'
 									: 'hover:bg-base-200'}"
@@ -157,7 +214,7 @@
 							id="limit"
 							bind:value={limit}
 							onchange={handleLimitChange}
-							class="border-base-content border-2 bg-transparent p-2 font-mono text-sm"
+							class="border-border border-2 bg-transparent p-2 font-mono text-sm"
 						>
 							<option value={25}>25</option>
 							<option value={50}>50</option>
@@ -174,7 +231,7 @@
 					<!-- Grid View -->
 					<div class="h-full overflow-y-auto p-6">
 						<div
-							class="grid grid-cols-1 gap-0 border
+							class="border-border grid grid-cols-1 gap-0 border
 						md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
 						>
 							{#each globalData.topClasses as classData, index}
@@ -184,7 +241,7 @@
 								).toFixed(2)}
 								<a href="https://tailwindcss.com/docs/{classData.classname}" target="_blank">
 									<div
-										class="border-base-content hover:bg-primary
+										class="border-border hover:bg-primary
 									hover:text-primary-content border
 									p-4"
 									>
@@ -203,7 +260,7 @@
 					{@const maxCount = globalData.topClasses[0]?.count || 1}
 					<!-- Chart View -->
 					<div class="h-full overflow-y-auto p-3">
-						<div class="space-y-[0.5px]">
+						<div class="">
 							{#each globalData.topClasses as classData, index}
 								{@const percentage = (
 									(classData.count / globalData.stats.totalClasses) *
@@ -263,3 +320,16 @@
 		</div>
 	{/if}
 </main>
+
+<style>
+	.scroller::after {
+		content: '';
+		position: absolute;
+		right: 0;
+		top: 0;
+		width: 3em;
+		height: 100%;
+		background: linear-gradient(90deg, transparent, var(--color-base-100));
+		pointer-events: none;
+	}
+</style>
