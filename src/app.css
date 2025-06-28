@@ -6,7 +6,7 @@
 @font-face {
 	font-family: 'AT Name Sans Variable';
 	src: url('https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/AT-NameSansVariable.ttf');
-	weight: 1 1000;
+	font-weight: 1 1000;
 }
 
 @plugin "daisyui";
