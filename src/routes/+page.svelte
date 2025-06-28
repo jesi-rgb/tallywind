@@ -3,13 +3,12 @@
 	import type { TailwindStats } from '$lib/services/repository';
 	import AnalysisProgress from '$lib/components/AnalysisProgress.svelte';
 	import RepoStats from '$lib/components/RepoStats.svelte';
+	import Button from '$lib/components/Button.svelte';
 
-	let repoUrl = $state('https://github.com/jesi-rgb/conduit');
+	let repoUrl = $state('');
 	let error = $state<string | null>(null);
 	let repoStats = $state<TailwindStats | null>(null);
 	let globalStats = $state<Array<{ className: string; count: number }>>([]);
-
-	$inspect(repoStats);
 
 	// Progress state for SSE
 	let isAnalyzing = $state(false);
@@ -152,12 +151,7 @@
 			<h1 class="text-4xl font-bold tracking-wider uppercase">TALLYWIND</h1>
 			<p class="mt-2 font-mono text-lg">TAILWIND CLASS COUNTER & ANALYZER</p>
 		</div>
-		<a
-			href="/global"
-			class="border-border hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
-		>
-			GLOBAL STATS
-		</a>
+		<Button href="/global" text="GLOBAL STATS" />
 	</div>
 
 	<!-- Main Content -->
@@ -177,13 +171,12 @@
 					/>
 				</div>
 
-				<button
-					class="border-border hover:bg-base-content hover:text-base-100 w-full border-2 p-3 font-mono font-bold uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+				<Button
+					text={isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
 					onclick={handleAnalyze}
 					disabled={isAnalyzing}
-				>
-					{isAnalyzing ? 'ANALYZING...' : 'ANALYZE REPOSITORY'}
-				</button>
+					classes="w-full"
+				/>
 
 				{#if error}
 					<div class="border-error bg-error/10 border-2 p-3 font-mono text-sm">

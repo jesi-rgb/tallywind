@@ -13,13 +13,12 @@
 
 	<!-- Stats Grid -->
 	<div class="flex h-full grow flex-col overflow-scroll md:flex-row">
-		<div class="join-vertical flex h-full flex-col p-6 md:w-1/2">
+		<div class="join-vertical flex h-full flex-col px-4 py-6 md:w-1/2">
 			<h3 class="mb-4 font-bold uppercase">Repo Stats</h3>
-			<div class="border-border join-item border">
-				<div class="border-border p-4 text-center">
-					<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
-					<div class="text-3xl font-bold">{repoStats.total}</div>
-				</div>
+
+			<div class="border-border join-item border p-4 text-center">
+				<div class="mb-2 font-mono text-sm uppercase">TOTAL CLASSES</div>
+				<div class="text-3xl font-bold">{repoStats.total}</div>
 			</div>
 
 			<div class="border-border join-item border p-4 text-center">
@@ -34,8 +33,8 @@
 		</div>
 
 		<!-- Top Classes -->
-		<div class="border-border mb-10 flex h-full flex-col p-6 md:w-1/2">
-			<h3 class="sticky mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
+		<div class="border-border mb-10 flex h-full flex-col px-4 py-6 md:w-full">
+			<h3 class="mb-4 font-bold uppercase">TOP 20 CLASSES</h3>
 			<div class="border-border overflow-y-scroll">
 				<div class="join-vertical grid h-1/3 grid-cols-1 gap-0">
 					{#each repoStats.topClasses as { className, count }, index}
