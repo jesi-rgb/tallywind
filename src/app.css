@@ -8,13 +8,13 @@
 }
 
 @font-face {
-	font-family: 'AT Name Sans Mono';
+	font-family: 'AT Name Mono';
 	src: url('https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/ATNameMono-Medium.otf');
 	font-weight: 500;
 }
 
 @font-face {
-	font-family: 'AT Name Sans Mono Italic';
+	font-family: 'AT Name Mono Italic';
 	src: url('https://jesi-rgb-fonts.s3.eu-west-3.amazonaws.com/ATNameMono-MediumItalic.otf');
 	font-weight: 500;
 	fonst-style: italic;
@@ -96,7 +96,7 @@
 
 @theme {
 	--font-sans: AT Name Sans Variable;
-	--font-mono: AT Name Mono Variable;
+	--font-mono: AT Name Mono;
 	--color-border: color-mix(in oklch, var(--color-base-100), var(--color-base-content) 30%);
 }
 
