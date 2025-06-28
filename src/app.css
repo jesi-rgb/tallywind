@@ -85,7 +85,7 @@
 
 @theme {
 	--font-sans: AT Name Sans Variable;
-	--font-mono: Tabular;
+	--font-mono: AT Name Mono Variable;
 	--color-border: color-mix(in oklch, var(--color-base-100), var(--color-base-content) 30%);
 }
 

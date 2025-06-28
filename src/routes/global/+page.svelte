@@ -281,7 +281,10 @@
 											<div class="mr-4 tabular-nums opacity-50">
 												#{(index + 1).toString().padStart(2, '0')}
 											</div>
-											<span class="font-extrabold">{classData.classname}</span>
+											<span
+												class="font-mono
+												font-extrabold">{classData.classname}</span
+											>
 											<span class="">
 												{classData.count.toLocaleString()}
 												({percentage}%)
@@ -298,7 +301,7 @@
 											<div class="mr-4 tabular-nums opacity-50">
 												#{(index + 1).toString().padStart(2, '0')}
 											</div>
-											<span class="font-extrabold">{classData.classname}</span>
+											<span class="font-mono font-extrabold">{classData.classname}</span>
 											<span class="justify-self-end">
 												{classData.count.toLocaleString()}
 												({percentage}%)

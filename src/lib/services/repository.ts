@@ -365,8 +365,7 @@ export async function getGlobalStats(): Promise<{
 			totalRepos: 0,
 			totalClasses: 0,
 			uniqueClasses: 0,
-			eligibleRepos: 0,
-			reposWithTailwind: 0
+			totalFiles: 0,
 		};
 	}
 }
@@ -387,7 +386,7 @@ function formatTailwindStats(repo: Repository, classCounts: Record<string, numbe
 		classCounts,
 		total,
 		topClasses,
-		lastUpdated: new Date(repo.analyzed_at)
+		lastUpdated: new Date(repo.analyzed_at),
 	};
 }
 
@@ -514,12 +513,16 @@ export async function analyzeRepositoryWithSSE(
 				const classCounts = await getClassCountsForRepo(repoRecord.id);
 				const stats = formatTailwindStats(repoRecord, classCounts);
 
+				console.log(repoRecord)
 				emitter.emit({
 					type: 'completed',
 					data: {
-						repoId: repoRecord.id,
-						repoOwner: repoRecord.owner,
-						repoName: repoRecord.name,
+						repo: {
+							id: repoRecord.id,
+							owner: repoRecord.owner,
+							name: repoRecord.name,
+							total_files: repoRecord.total_files,
+						},
 						totalClasses: stats.total,
 						topClasses: stats.topClasses,
 						classCounts: stats.classCounts
@@ -691,7 +694,8 @@ export async function analyzeRepositoryWithSSE(
 				repoId: repoRecord.id,
 				totalClasses: stats.total,
 				topClasses: stats.topClasses,
-				classCounts: stats.classCounts
+				classCounts: stats.classCounts,
+				totalFiles: stats.totalFiles
 			}
 		});
 
