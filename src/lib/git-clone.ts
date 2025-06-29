@@ -68,7 +68,6 @@ export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]>
 			const entries = await readdir(dirPath);
 
 			for (const entry of entries) {
-				.git directory and other hidden directories
 				if (entry.startsWith('.')) continue;
 
 				const fullPath = join(dirPath, entry);
@@ -81,7 +80,7 @@ export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]>
 					files.push({
 						name: entry,
 						path: relativeFilePath.replace(/\\/g, '/'),
-						sha: '', , but not needed for our use case
+						sha: '',
 						type: 'file',
 						url: '',
 						download_url: null
