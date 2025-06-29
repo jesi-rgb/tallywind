@@ -112,15 +112,6 @@ async function githubFetch(url: string): Promise<Response> {
 	return response;
 }
 
-// Smart delay function that checks rate limit headers
-async function smartDelay(response: Response): Promise<void> {
-	const rateLimitInfo = parseRateLimitHeaders(response);
-	const delayMs = calculateDelayMs(rateLimitInfo);
-
-	if (delayMs > 0) {
-		await new Promise((resolve) => setTimeout(resolve, delayMs));
-	}
-}
 // Get repository information
 export async function getRepository(owner: string, repo: string): Promise<GitHubRepo | null> {
 	try {
@@ -138,42 +129,49 @@ export async function getRepository(owner: string, repo: string): Promise<GitHub
 	}
 }
 
-// Recursively get all files in a repository
+// Get all files in a repository using the Trees API (single request)
 export async function getAllFiles(
 	owner: string,
 	repo: string,
 	branch: string
 ): Promise<GitHubFile[]> {
 	try {
-		let allFiles: GitHubFile[] = [];
-		const queue: { path: string }[] = [{ path: '' }];
+		// First get the commit SHA for the branch
+		const branchResponse = await githubFetch(
+			`https://api.github.com/repos/${owner}/${repo}/branches/${branch}`
+		);
 
-		while (queue.length > 0) {
-			const { path } = queue.shift()!;
-			const url = path
-				? `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`
-				: `https://api.github.com/repos/${owner}/${repo}/contents?ref=${branch}`;
-
-			const response = await githubFetch(url);
-
-			if (!response.ok) {
-				console.error(`Error fetching contents for ${path}: ${response.status}`);
-				continue;
-			}
-
-			const contents: GitHubFile[] = await response.json();
-
-			for (const item of contents) {
-				if (item.type === 'dir') {
-					queue.push({ path: item.path });
-				} else if (item.type === 'file') {
-					allFiles.push(item);
-				}
-			}
-
-			// Smart rate limit handling
-			await smartDelay(response);
+		if (!branchResponse.ok) {
+			console.error(`Error fetching branch ${branch}: ${branchResponse.status}`);
+			return [];
 		}
+
+		const branchData = await branchResponse.json();
+		const treeSha = branchData.commit.commit.tree.sha;
+
+		// Use the Trees API to get all files recursively in one request
+		const treeResponse = await githubFetch(
+			`https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`
+		);
+
+		if (!treeResponse.ok) {
+			console.error(`Error fetching tree: ${treeResponse.status}`);
+			return [];
+		}
+
+		const treeData = await treeResponse.json();
+
+		// Convert tree items to GitHubFile format, filtering only files
+		const allFiles: GitHubFile[] = treeData.tree
+			.filter((item: any) => item.type === 'blob') // Only files, not directories
+			.map((item: any) => ({
+				name: item.path.split('/').pop() || item.path,
+				path: item.path,
+				sha: item.sha,
+				type: 'file' as const,
+				url: `https://api.github.com/repos/${owner}/${repo}/git/blobs/${item.sha}`,
+				download_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${item.path}`
+			}));
 
 		return allFiles;
 	} catch (error) {

@@ -9,7 +9,6 @@
 	let repoUrl = $state('');
 	let error = $state<string | null>(null);
 	let repoStats = $state<TailwindStats | null>(null);
-	let globalStats = $state<Array<{ className: string; count: number }>>([]);
 
 	// Progress state for SSE
 	let isAnalyzing = $state(false);
@@ -20,19 +19,6 @@
 		totalFiles?: number;
 		currentFile?: string;
 	} | null>(null);
-
-	onMount(async () => {
-		try {
-			const response = await fetch('/api/global');
-			if (response.ok) {
-				globalStats = await response.json();
-			} else {
-				console.error('Error fetching global stats:', response.status);
-			}
-		} catch (e) {
-			console.error('Error fetching global stats:', e);
-		}
-	});
 
 	async function handleAnalyze() {
 		if (!repoUrl) {
