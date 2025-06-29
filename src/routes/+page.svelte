@@ -9,7 +9,6 @@
 	let repoUrl = $state('');
 	let error = $state<string | null>(null);
 	let repoStats = $state<TailwindStats | null>(null);
-	console.log(repoStats);
 
 	// Progress state for SSE
 	let isAnalyzing = $state(false);
