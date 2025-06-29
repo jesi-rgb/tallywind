@@ -249,7 +249,10 @@ export async function cleanupStaleProcessingStates(): Promise<void> {
 }
 
 // Try to acquire processing lock for a repository
-export async function tryAcquireProcessingLock(repoUrl: string): Promise<Repository | null> {
+export async function tryAcquireProcessingLock(
+	repoUrl: string,
+	forceReprocess: boolean = false
+): Promise<Repository | null> {
 	if (!db) return null;
 
 	try {
@@ -265,20 +268,21 @@ export async function tryAcquireProcessingLock(repoUrl: string): Promise<Reposit
 		if (existingRepo) {
 			console.log(`[${repoUrl}] Found existing repo with status: ${existingRepo.status}`);
 
-			// If repo is completed, don't acquire lock - let it use cached data path
-			if (existingRepo.status === 'completed') {
+			// If repo is completed and we're not forcing reprocess, don't acquire lock
+			if (existingRepo.status === 'completed' && !forceReprocess) {
 				console.log(`[${repoUrl}] Repository is completed, not acquiring lock`);
 				return null;
 			}
-
 			// If repo exists and is currently processing, return null (can't acquire lock)
 			if (existingRepo.status === 'processing') {
 				console.log(`[${repoUrl}] Repository is currently processing, cannot acquire lock`);
 				return null;
 			}
 
-			// Only acquire lock for failed/ineligible repos that need reprocessing
-			console.log(`[${repoUrl}] Acquiring lock for reprocessing (status: ${existingRepo.status})`);
+			// Acquire lock for reprocessing (failed/ineligible repos or forced reprocess)
+			console.log(
+				`[${repoUrl}] Acquiring lock for reprocessing (status: ${existingRepo.status}, forced: ${forceReprocess})`
+			);
 			const [updatedRepo] = await db
 				.update(repositories)
 				.set({
@@ -568,8 +572,8 @@ export async function analyzeRepositoryWithSSE(
 		}
 		// Only try to acquire lock if no valid cache exists
 		console.log(`[${owner}/${repo}] No valid cache found, attempting to acquire processing lock`);
-		repoRecord = await tryAcquireProcessingLock(repoUrl);
-
+		const needsReprocessing = existingRepo?.status === 'completed' || false;
+		repoRecord = await tryAcquireProcessingLock(repoUrl, needsReprocessing);
 		if (!repoRecord) {
 			console.log(`[${owner}/${repo}] Could not acquire lock, starting fresh repository analysis`);
 			emitter.emit({
@@ -776,6 +780,212 @@ export async function analyzeRepositoryWithSSE(
 				.where(eq(repositories.id, repoRecord.id));
 
 			const stats = formatTailwindStats(updatedRepo, classCounts);
+
+			// Emit completion event
+			emitter.emit({
+				type: 'completed',
+				data: {
+					repo: updatedRepo,
+					totalClasses: stats.total,
+					topClasses: stats.topClasses,
+					classCounts: stats.classCounts
+				}
+			});
+
+			emitter.close();
+		} else {
+			// We successfully acquired lock for reprocessing existing repo
+			console.log(
+				`[${owner}/${repo}] Successfully acquired lock for reprocessing existing repository`
+			);
+
+			emitter.emit({
+				type: 'progress',
+				data: { status: 'fetching', currentFile: 'Cloning repository for reprocessing' }
+			});
+
+			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo);
+
+			if (!repoAnalysis) {
+				console.error('Could not clone repository for reprocessing:', repoUrl);
+				emitter.emit({
+					type: 'error',
+					data: { message: 'Could not clone repository for reprocessing' }
+				});
+				emitter.close();
+				return;
+			}
+
+			const eligibility = repoAnalysis.eligibility;
+
+			if (!eligibility.isEligible) {
+				// Update existing repository record with new eligibility info
+				await db
+					.update(repositories)
+					.set({
+						status: 'ineligible',
+						processing_started_at: null,
+						analyzed_at: new Date(),
+						is_eligible: false,
+						has_tailwind: eligibility.hasTailwind,
+						has_package_json: eligibility.packageJsonExists,
+						eligibility_reason: eligibility.reason
+					})
+					.where(eq(repositories.id, repoRecord.id));
+
+				await repoAnalysis.cleanup();
+				emitter.emit({
+					type: 'error',
+					data: { message: eligibility.reason || 'Repository is not eligible for analysis' }
+				});
+				emitter.close();
+				return;
+			}
+
+			// Filter files that are eligible for Tailwind analysis
+			const eligibleFiles = repoAnalysis.files.filter((file) => shouldParseFile(file.path));
+
+			// Update database with file counts
+			await db
+				.update(repositories)
+				.set({
+					total_files: eligibleFiles.length,
+					processed_files: 0
+				})
+				.where(eq(repositories.id, repoRecord.id));
+
+			emitter.emit({
+				type: 'progress',
+				data: {
+					status: 'parsing',
+					totalFiles: eligibleFiles.length,
+					filesProcessed: 0,
+					repoId: repoRecord.id
+				}
+			});
+
+			// Process files to find Tailwind classes
+			const filesToProcess = [];
+			let filesProcessed = 0;
+
+			for (const file of eligibleFiles) {
+				emitter.emit({
+					type: 'progress',
+					data: {
+						status: 'parsing',
+						currentFile: file.path,
+						filesProcessed,
+						totalFiles: eligibleFiles.length,
+						repoId: repoRecord.id
+					}
+				});
+
+				const content = await repoAnalysis.getFileContent(file.path);
+				if (content) {
+					filesToProcess.push({
+						name: file.path,
+						content
+					});
+				}
+
+				filesProcessed++;
+
+				// Update database progress
+				await db
+					.update(repositories)
+					.set({ processed_files: filesProcessed })
+					.where(eq(repositories.id, repoRecord.id));
+
+				// Emit file processed event
+				emitter.emit({
+					type: 'file-processed',
+					data: {
+						filePath: file.path,
+						classesFound: 0, // We'll update this after counting
+						filesProcessed,
+						totalFiles: eligibleFiles.length
+					}
+				});
+			}
+
+			// Count Tailwind classes
+			emitter.emit({
+				type: 'progress',
+				data: {
+					status: 'analyzing',
+					currentFile: 'Counting Tailwind classes',
+					repoId: repoRecord.id
+				}
+			});
+
+			const classCounts = countTailwindClasses(filesToProcess);
+
+			// Delete any existing class counts for this repo
+			emitter.emit({
+				type: 'progress',
+				data: {
+					status: 'saving',
+					currentFile: 'Saving to database',
+					repoId: repoRecord.id
+				}
+			});
+
+			await db.delete(tailwindClasses).where(eq(tailwindClasses.repo_id, repoRecord.id));
+
+			// Insert new class counts
+			const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
+				([class_name, count]) => ({
+					repo_id: repoRecord!.id,
+					class_name,
+					count
+				})
+			);
+
+			// Batch insert class counts
+			if (classRows.length > 0) {
+				// Insert in batches to avoid too many parameters error
+				const BATCH_SIZE = 100;
+				for (let i = 0; i < classRows.length; i += BATCH_SIZE) {
+					const batch = classRows.slice(i, i + BATCH_SIZE);
+					await db.insert(tailwindClasses).values(batch);
+
+					emitter.emit({
+						type: 'progress',
+						data: {
+							status: 'saving',
+							currentFile: `Saving batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(classRows.length / BATCH_SIZE)}`,
+							repoId: repoRecord.id
+						}
+					});
+				}
+			}
+
+			// Calculate total classes
+			const totalClasses = Object.values(classCounts).reduce((sum, count) => sum + count, 0);
+
+			// Update repo status to completed and release lock
+			await db
+				.update(repositories)
+				.set({
+					status: 'completed',
+					analyzed_at: new Date(),
+					processing_started_at: null,
+					total_classes: totalClasses
+				})
+				.where(eq(repositories.id, repoRecord.id));
+
+			// Cleanup temporary directory
+			await repoAnalysis.cleanup();
+
+			// Get updated repo record
+			const [updatedRepo] = await db
+				.select()
+				.from(repositories)
+				.where(eq(repositories.id, repoRecord.id));
+
+			const stats = formatTailwindStats(updatedRepo, classCounts);
+
+			console.log(`[${owner}/${repo}] Reprocessing completed (${stats.total} total classes)`);
 
 			// Emit completion event
 			emitter.emit({

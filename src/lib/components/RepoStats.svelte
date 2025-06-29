@@ -3,11 +3,11 @@
 	$inspect(repoStats);
 </script>
 
-<div class="border-border flex h-full flex-col overflow-scroll border-t-2">
+<div class="border-border flex h-full flex-col overflow-scroll">
 	<!-- Results Header -->
-	<div class="border-border border-b-2 p-6">
-		<h2 class="text-xl font-bold">
-			RESULTS: {repoStats.repo.owner}/{repoStats.repo.name}
+	<div class="border-border border-b p-4">
+		<h2 class="font-mono text-xl font-bold">
+			{repoStats.repo.owner}/{repoStats.repo.name}
 		</h2>
 	</div>
 
