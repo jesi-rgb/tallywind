@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
+// Define types
 type GitHubFile = {
 	name: string;
 	path: string;
@@ -20,27 +21,69 @@ type LocalRepoInfo = {
 	cleanup: () => Promise<void>;
 };
 
+// Get the default branch of a repository without cloning
+export async function getDefaultBranch(owner: string, repo: string): Promise<string> {
+	try {
+		const repoUrl = `https://github.com/${owner}/${repo}.git`;
+
+		// Use git ls-remote to get the default branch without cloning
+		const { stdout } = await execAsync(`git ls-remote --symref ${repoUrl} HEAD`);
+
+		// Parse the output to find the default branch
+		// Output format: "ref: refs/heads/main	HEAD"
+		const match = stdout.match(/ref: refs\/heads\/([^\s]+)/);
+		if (match) {
+			return match[1];
+		}
+
+		// Fallback: try common default branch names
+		const commonBranches = ['main', 'master', 'develop'];
+		for (const branch of commonBranches) {
+			try {
+				const { stdout: branchCheck } = await execAsync(
+					`git ls-remote --heads ${repoUrl} ${branch}`
+				);
+				if (branchCheck.trim()) {
+					return branch;
+				}
+			} catch {
+				// Continue to next branch
+			}
+		}
+
+		// Final fallback
+		return 'main';
+	} catch (error) {
+		console.error('Error getting default branch:', error);
+		return 'main';
+	}
+}
+
+// Clone repository locally using shallow clone for efficiency
 export async function cloneRepository(
 	owner: string,
 	repo: string,
-	branch: string = 'main'
+	branch?: string
 ): Promise<LocalRepoInfo | null> {
 	try {
-
+		// Create unique temporary directory
 		const tempDir = join(tmpdir(), `tallywind-${owner}-${repo}-${Date.now()}`);
-		const repoUrl = `https:.com/${owner}/${repo}.git`;
+		const repoUrl = `https://github.com/${owner}/${repo}.git`;
 
+		// Get default branch if not specified
+		const targetBranch = branch || (await getDefaultBranch(owner, repo));
 
+		// Clone with optimizations for speed and efficiency
 		const cloneCommand = [
 			'git clone',
 			'--single-branch',
 			'--depth=1',
-			`--branch=${branch}`,
+			`--branch=${targetBranch}`,
 			repoUrl,
 			tempDir
 		].join(' ');
 
-		console.log(`Cloning repository: ${owner}/${repo}`);
+		console.log(`Cloning repository: ${owner}/${repo} (branch: ${targetBranch})`);
 		await execAsync(cloneCommand);
 
 		return {
@@ -59,7 +102,7 @@ export async function cloneRepository(
 	}
 }
 
-
+// Get all files from local repository
 export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]> {
 	const files: GitHubFile[] = [];
 
@@ -68,6 +111,7 @@ export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]>
 			const entries = await readdir(dirPath);
 
 			for (const entry of entries) {
+				// Skip .git directory and other hidden directories
 				if (entry.startsWith('.')) continue;
 
 				const fullPath = join(dirPath, entry);
@@ -79,10 +123,10 @@ export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]>
 				} else if (stats.isFile()) {
 					files.push({
 						name: entry,
-						path: relativeFilePath.replace(/\\/g, '/'),
-						sha: '',
+						path: relativeFilePath.replace(/\\/g, '/'), // Normalize path separators
+						sha: '', // Not available locally, but not needed for our use case
 						type: 'file',
-						url: '',
+						url: '', // Not applicable for local files
 						download_url: null
 					});
 				}
@@ -96,7 +140,7 @@ export async function getAllFilesLocal(localPath: string): Promise<GitHubFile[]>
 	return files;
 }
 
-
+// Get file content from local repository
 export async function getFileContentLocal(
 	localPath: string,
 	filePath: string
@@ -111,7 +155,7 @@ export async function getFileContentLocal(
 	}
 }
 
-
+// Check repository eligibility using local clone
 export async function checkRepositoryEligibilityLocal(localPath: string): Promise<{
 	isEligible: boolean;
 	hasTailwind: boolean;
@@ -125,7 +169,7 @@ export async function checkRepositoryEligibilityLocal(localPath: string): Promis
 			const packageContent = await readFile(packageJsonPath, 'utf-8');
 			const packageJson = JSON.parse(packageContent);
 
-
+			// Check for Tailwind CSS in dependencies or devDependencies
 			const dependencies = packageJson.dependencies || {};
 			const devDependencies = packageJson.devDependencies || {};
 
@@ -168,11 +212,11 @@ export async function checkRepositoryEligibilityLocal(localPath: string): Promis
 	}
 }
 
-
+// Convenience function that combines cloning and analysis
 export async function analyzeRepositoryLocal(
 	owner: string,
 	repo: string,
-	branch: string = 'main'
+	branch?: string
 ): Promise<{
 	files: GitHubFile[];
 	eligibility: {
@@ -183,6 +227,7 @@ export async function analyzeRepositoryLocal(
 	};
 	cleanup: () => Promise<void>;
 	getFileContent: (filePath: string) => Promise<string | null>;
+	defaultBranch: string;
 } | null> {
 	const repoInfo = await cloneRepository(owner, repo, branch);
 	if (!repoInfo) return null;
@@ -193,11 +238,15 @@ export async function analyzeRepositoryLocal(
 			checkRepositoryEligibilityLocal(repoInfo.localPath)
 		]);
 
+		// Get the actual branch that was cloned
+		const actualBranch = branch || (await getDefaultBranch(owner, repo));
+
 		return {
 			files,
 			eligibility,
 			cleanup: repoInfo.cleanup,
-			getFileContent: (filePath: string) => getFileContentLocal(repoInfo.localPath, filePath)
+			getFileContent: (filePath: string) => getFileContentLocal(repoInfo.localPath, filePath),
+			defaultBranch: actualBranch
 		};
 	} catch (error) {
 		console.error('Error analyzing repository:', error);

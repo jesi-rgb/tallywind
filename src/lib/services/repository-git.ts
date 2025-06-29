@@ -50,7 +50,7 @@ export async function analyzeRepositoryWithGitClone(
 		let isExisting = !!repoRecord;
 
 		// If this is an existing repo, check if we need to update or return cached data
-		if (isExisting && repoRecord.status === 'completed') {
+		if (repoRecord && isExisting && repoRecord.status === 'completed') {
 			// If it was analyzed recently (e.g., within the last 24 hours), return cached results
 			const lastAnalyzed = new Date(repoRecord.analyzed_at);
 			const now = new Date();
@@ -63,17 +63,10 @@ export async function analyzeRepositoryWithGitClone(
 			}
 		}
 
-		// Get repository info from GitHub if needed
+		// Get repository info using git clone (no API needed)
 		if (!repoRecord) {
-			const githubRepo = await github.getRepository(owner, repo);
-			if (!githubRepo) {
-				console.error('Could not fetch repository from GitHub:', repoUrl);
-				return null;
-			}
-
-			// Clone repository locally and check eligibility
-			const defaultBranch = githubRepo.default_branch;
-			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo, defaultBranch);
+			// Clone repository locally and check eligibility (auto-detects default branch)
+			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo);
 
 			if (!repoAnalysis) {
 				console.error('Could not clone repository:', repoUrl);
@@ -86,7 +79,7 @@ export async function analyzeRepositoryWithGitClone(
 					url: repoUrl,
 					owner,
 					name: repo,
-					default_branch: defaultBranch,
+					default_branch: repoAnalysis.defaultBranch,
 					analyzed_at: new Date(),
 					status: 'ineligible',
 					is_eligible: false,
@@ -105,7 +98,7 @@ export async function analyzeRepositoryWithGitClone(
 				url: repoUrl,
 				owner,
 				name: repo,
-				default_branch: defaultBranch,
+				default_branch: repoAnalysis.defaultBranch,
 				analyzed_at: new Date(),
 				status: 'processing',
 				is_eligible: true,
@@ -160,7 +153,7 @@ export async function analyzeRepositoryWithGitClone(
 			// Insert new class counts
 			const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
 				([class_name, count]) => ({
-					repo_id: repoRecord.id,
+					repo_id: repoRecord!.id,
 					class_name,
 					count
 				})
@@ -245,7 +238,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 		let isExisting = !!repoRecord;
 
 		// If this is an existing repo, check if we need to update or return cached data
-		if (isExisting && repoRecord.status === 'completed') {
+		if (repoRecord && isExisting && repoRecord.status === 'completed') {
 			// If it was analyzed recently (e.g., within the last 48 hours), return cached results
 			const lastAnalyzed = new Date(repoRecord.analyzed_at);
 			const now = new Date();
@@ -259,7 +252,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 				emitter.emit({
 					type: 'completed',
 					data: {
-						repoId: repoRecord.id,
+						repo: repoRecord,
 						totalClasses: stats.total,
 						topClasses: stats.topClasses,
 						classCounts: stats.classCounts
@@ -270,27 +263,15 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 			}
 		}
 
-		// Get repository info from GitHub if needed
+		// Get repository info using git clone (no API needed)
 		if (!repoRecord) {
-			const githubRepo = await github.getRepository(owner, repo);
-			if (!githubRepo) {
-				console.error('Could not fetch repository from GitHub:', repoUrl);
-				emitter.emit({
-					type: 'error',
-					data: { message: 'Could not fetch repository from GitHub' }
-				});
-				emitter.close();
-				return;
-			}
-
 			// Clone repository locally and check eligibility
 			emitter.emit({
 				type: 'progress',
 				data: { status: 'fetching', currentFile: 'Cloning repository' }
 			});
 
-			const defaultBranch = githubRepo.default_branch;
-			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo, defaultBranch);
+			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo);
 
 			if (!repoAnalysis) {
 				console.error('Could not clone repository:', repoUrl);
@@ -308,7 +289,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 					url: repoUrl,
 					owner,
 					name: repo,
-					default_branch: defaultBranch,
+					default_branch: repoAnalysis.defaultBranch,
 					analyzed_at: new Date(),
 					status: 'ineligible',
 					is_eligible: false,
@@ -334,7 +315,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 				url: repoUrl,
 				owner,
 				name: repo,
-				default_branch: defaultBranch,
+				default_branch: repoAnalysis.defaultBranch,
 				analyzed_at: new Date(),
 				status: 'processing',
 				is_eligible: true,
@@ -439,7 +420,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 			// Insert new class counts
 			const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
 				([class_name, count]) => ({
-					repo_id: repoRecord.id,
+					repo_id: repoRecord!.id,
 					class_name,
 					count
 				})
@@ -492,7 +473,7 @@ export async function analyzeRepositoryWithSSEAndGitClone(
 			emitter.emit({
 				type: 'completed',
 				data: {
-					repoId: repoRecord.id,
+					repo: repoRecord,
 					totalClasses: stats.total,
 					topClasses: stats.topClasses,
 					classCounts: stats.classCounts

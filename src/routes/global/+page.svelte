@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/Button.svelte';
 	import { onMount } from 'svelte';
 
 	interface GlobalClass {
@@ -108,12 +109,8 @@
 				<h1 class="text-4xl font-bold uppercase">GLOBAL DASHBOARD</h1>
 				<p class="mt-2 font-mono text-lg">TAILWIND CLASS USAGE STATISTICS</p>
 			</div>
-			<a
-				href="/"
-				class="border-border hover:bg-base-content hover:text-base-100 border-2 px-4 py-2 font-mono uppercase transition-colors"
-			>
-				← BACK TO ANALYZER
-			</a>
+
+			<Button href="/" text="← BACK TO ANALYZER" />
 		</div>
 	</div>
 

@@ -1,4 +1,4 @@
-import type { Repository } from "./db/schema";
+import type { Repository } from './db/schema';
 
 export type SSEEventType = 'progress' | 'file-processed' | 'completed' | 'error';
 
