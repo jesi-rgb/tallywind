@@ -3,7 +3,7 @@ const testSSE = async () => {
 	console.log('Testing SSE endpoint...');
 
 	try {
-		const response = await fetch('http://localhost:5174/api/repo', {
+		const response = await fetch('http://localhost:5173/api/repo', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'

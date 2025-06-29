@@ -4,6 +4,7 @@
 	import AnalysisProgress from '$lib/components/AnalysisProgress.svelte';
 	import RepoStats from '$lib/components/RepoStats.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import { normalizeGitHubUrl } from '$lib/utils/github';
 
 	let repoUrl = $state('');
 	let error = $state<string | null>(null);
@@ -44,6 +45,8 @@
 			error = 'Please enter a valid GitHub repository URL';
 			return;
 		}
+
+		repoUrl = normalizeGitHubUrl(repoUrl);
 
 		error = null;
 		isAnalyzing = true;
