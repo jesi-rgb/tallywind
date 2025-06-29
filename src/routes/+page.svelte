@@ -101,12 +101,7 @@
 								}
 							} else if (currentEventType === 'completed') {
 								repoStats = {
-									repo: {
-										id: data.repo,
-										owner: data.repo.owner,
-										name: data.repo.name,
-										files: data.repo.total_files
-									} as any,
+									repo: data.repo,
 									classCounts: data.classCounts,
 									total: data.totalClasses,
 									topClasses: data.topClasses,

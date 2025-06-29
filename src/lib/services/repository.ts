@@ -7,8 +7,9 @@ import {
 	type NewTailwindClass
 } from '$lib/db/schema';
 import * as github from '$lib/github';
+import * as gitClone from '$lib/git-clone';
 import { countTailwindClasses, shouldParseFile } from '$lib/tailwind-parser';
-import { count, eq, sql, sum } from 'drizzle-orm';
+import { eq, sql, sum } from 'drizzle-orm';
 import { SSEEmitter } from '$lib/sse';
 
 export type TailwindStats = {
@@ -25,7 +26,197 @@ export type TailwindStats = {
 	};
 };
 
-// Analyze a GitHub repository and save the results to the database
+// Analyze a GitHub repository using git clone approach
+export async function analyzeRepositoryWithGitClone(
+	repoUrl: string
+): Promise<TailwindStats | null> {
+	if (!db) {
+		console.error('Database is not available');
+		return null;
+	}
+
+	try {
+		// Parse GitHub URL
+		const repoInfo = github.parseGitHubUrl(repoUrl);
+		if (!repoInfo) {
+			console.error('Invalid GitHub URL:', repoUrl);
+			return null;
+		}
+
+		const { owner, repo } = repoInfo;
+
+		// Check if we've already analyzed this repo
+		let repoRecord = await getRepositoryByUrl(repoUrl);
+		let isExisting = !!repoRecord;
+
+		// If not, get repository info from GitHub and insert it
+		if (!repoRecord) {
+			const githubRepo = await github.getRepository(owner, repo);
+			if (!githubRepo) {
+				console.error('Could not fetch repository from GitHub:', repoUrl);
+				return null;
+			}
+
+			// Clone repository locally and check eligibility
+			const defaultBranch = githubRepo.default_branch;
+			const repoAnalysis = await gitClone.analyzeRepositoryLocal(owner, repo, defaultBranch);
+
+			if (!repoAnalysis) {
+				console.error('Could not clone repository:', repoUrl);
+				return null;
+			}
+
+			if (!repoAnalysis.eligibility.isEligible) {
+				// Create repository record with eligibility info but don't analyze
+				const newRepo: NewRepository = {
+					url: repoUrl,
+					owner,
+					name: repo,
+					default_branch: defaultBranch,
+					analyzed_at: new Date(),
+					status: 'ineligible',
+					is_eligible: false,
+					has_tailwind: repoAnalysis.eligibility.hasTailwind,
+					has_package_json: repoAnalysis.eligibility.packageJsonExists,
+					eligibility_reason: repoAnalysis.eligibility.reason
+				};
+
+				await db.insert(repositories).values(newRepo).returning();
+				await repoAnalysis.cleanup();
+				return null;
+			}
+
+			// Create new repository record
+			const newRepo: NewRepository = {
+				url: repoUrl,
+				owner,
+				name: repo,
+				default_branch: defaultBranch,
+				analyzed_at: new Date(),
+				status: 'processing',
+				is_eligible: true,
+				has_tailwind: repoAnalysis.eligibility.hasTailwind,
+				has_package_json: repoAnalysis.eligibility.packageJsonExists
+			};
+
+			// Insert into database
+			const [insertedRepo] = await db.insert(repositories).values(newRepo).returning();
+			repoRecord = insertedRepo;
+
+			// Filter files that are eligible for Tailwind analysis
+			const eligibleFiles = repoAnalysis.files.filter((file) => shouldParseFile(file.path));
+
+			// Update database with file counts
+			await db
+				.update(repositories)
+				.set({
+					total_files: eligibleFiles.length,
+					processed_files: 0
+				})
+				.where(eq(repositories.id, repoRecord.id));
+
+			// Process files to find Tailwind classes
+			const filesToProcess = [];
+			let filesProcessed = 0;
+
+			for (const file of eligibleFiles) {
+				const content = await repoAnalysis.getFileContent(file.path);
+				if (content) {
+					filesToProcess.push({
+						name: file.path,
+						content
+					});
+				}
+
+				filesProcessed++;
+
+				// Update database progress
+				await db
+					.update(repositories)
+					.set({ processed_files: filesProcessed })
+					.where(eq(repositories.id, repoRecord.id));
+			}
+
+			// Count Tailwind classes
+			const classCounts = countTailwindClasses(filesToProcess);
+
+			// Delete any existing class counts for this repo
+			await db.delete(tailwindClasses).where(eq(tailwindClasses.repo_id, repoRecord.id));
+
+			// Insert new class counts
+			const classRows: NewTailwindClass[] = Object.entries(classCounts).map(
+				([class_name, count]) => ({
+					repo_id: repoRecord.id,
+					class_name,
+					count
+				})
+			);
+
+			// Batch insert class counts
+			if (classRows.length > 0) {
+				// Insert in batches to avoid too many parameters error
+				const BATCH_SIZE = 100;
+				for (let i = 0; i < classRows.length; i += BATCH_SIZE) {
+					const batch = classRows.slice(i, i + BATCH_SIZE);
+					await db.insert(tailwindClasses).values(batch);
+				}
+			}
+
+			// Calculate total classes
+			const totalClasses = Object.values(classCounts).reduce((sum, count) => sum + count, 0);
+
+			// Update repo status to completed
+			await db
+				.update(repositories)
+				.set({
+					status: 'completed',
+					analyzed_at: new Date(),
+					total_classes: totalClasses
+				})
+				.where(eq(repositories.id, repoRecord.id));
+
+			// Cleanup temporary directory
+			await repoAnalysis.cleanup();
+
+			// Get updated repo record
+			const [updatedRepo] = await db
+				.select()
+				.from(repositories)
+				.where(eq(repositories.id, repoRecord.id));
+
+			return formatTailwindStats(updatedRepo, classCounts);
+		}
+
+		if (!repoRecord) {
+			console.error('Failed to create or retrieve repository record');
+			return null;
+		}
+
+		// If this is an existing repo, check if we need to update or return cached data
+		if (isExisting && repoRecord.status === 'completed') {
+			// If it was analyzed recently (e.g., within the last 24 hours), return cached results
+			const lastAnalyzed = new Date(repoRecord.analyzed_at);
+			const now = new Date();
+			const hoursSinceLastUpdate = (now.getTime() - lastAnalyzed.getTime()) / (1000 * 60 * 60);
+
+			if (hoursSinceLastUpdate < 24) {
+				// Return cached results
+				const classCounts = await getClassCountsForRepo(repoRecord.id);
+				return formatTailwindStats(repoRecord, classCounts);
+			}
+		}
+
+		// For existing repos that need re-analysis, use the same logic as above
+		// This is a simplified version - you might want to implement full re-analysis
+		const classCounts = await getClassCountsForRepo(repoRecord.id);
+		return formatTailwindStats(repoRecord, classCounts);
+	} catch (error) {
+		console.error('Error analyzing repository:', error);
+		return null;
+	}
+}
+
+// Original analyze function (keeping for backward compatibility)
 export async function analyzeRepository(repoUrl: string): Promise<TailwindStats | null> {
 	if (!db) {
 		console.error('Database is not available');
@@ -279,7 +470,7 @@ export async function getLongestClassName(): Promise<{
 	repo: {
 		owner: string;
 		name: string;
-	}
+	};
 } | null> {
 	if (!db) return null;
 
@@ -297,7 +488,6 @@ export async function getLongestClassName(): Promise<{
 			.orderBy(sql`LENGTH(${tailwindClasses.class_name}) DESC`)
 			.limit(1);
 
-
 		const data = result[0] as any;
 		if (!data) return null;
 
@@ -306,7 +496,7 @@ export async function getLongestClassName(): Promise<{
 			length: parseInt(data.length),
 			repo: {
 				owner: result[0].owner,
-				name: result[0].name,
+				name: result[0].name
 			}
 		};
 	} catch (error) {
@@ -351,13 +541,13 @@ export async function getGlobalStats(): Promise<{
 		const repoData = repoStats[0] as any;
 		const classData = classStats[0] as any;
 		const filesData = filesStats[0] as any;
-		console.log(repoData)
+		console.log(repoData);
 
 		return {
 			totalRepos: parseInt(repoData.repos_with_tailwind) || 0,
 			totalClasses: parseInt(repoData.total_classes) || 0,
 			uniqueClasses: parseInt(classData.unique_classes) || 0,
-			totalFiles: parseInt(filesData.totalFiles) || 0,
+			totalFiles: parseInt(filesData.totalFiles) || 0
 		};
 	} catch (error) {
 		console.error('Error getting global stats:', error);
@@ -365,7 +555,7 @@ export async function getGlobalStats(): Promise<{
 			totalRepos: 0,
 			totalClasses: 0,
 			uniqueClasses: 0,
-			totalFiles: 0,
+			totalFiles: 0
 		};
 	}
 }
@@ -386,7 +576,7 @@ function formatTailwindStats(repo: Repository, classCounts: Record<string, numbe
 		classCounts,
 		total,
 		topClasses,
-		lastUpdated: new Date(repo.analyzed_at),
+		lastUpdated: new Date(repo.analyzed_at)
 	};
 }
 
@@ -414,15 +604,11 @@ export async function analyzeRepositoryWithSSE(
 
 		const { owner, repo } = repoInfo;
 
-		// Emit initial progress
-		emitter.emit({
-			type: 'progress',
-			data: { status: 'fetching', currentFile: 'Repository metadata' }
-		});
 
 		// Check if we've already analyzed this repo
 		let repoRecord = await getRepositoryByUrl(repoUrl);
 		let isExisting = !!repoRecord;
+
 
 		// If not, get repository info from GitHub and insert it
 		if (!repoRecord) {
@@ -513,16 +699,10 @@ export async function analyzeRepositoryWithSSE(
 				const classCounts = await getClassCountsForRepo(repoRecord.id);
 				const stats = formatTailwindStats(repoRecord, classCounts);
 
-				console.log(repoRecord)
 				emitter.emit({
 					type: 'completed',
 					data: {
-						repo: {
-							id: repoRecord.id,
-							owner: repoRecord.owner,
-							name: repoRecord.name,
-							total_files: repoRecord.total_files,
-						},
+						repo: repoRecord,
 						totalClasses: stats.total,
 						topClasses: stats.topClasses,
 						classCounts: stats.classCounts
@@ -691,11 +871,10 @@ export async function analyzeRepositoryWithSSE(
 		emitter.emit({
 			type: 'completed',
 			data: {
-				repoId: repoRecord.id,
+				repo: repoRecord,
 				totalClasses: stats.total,
 				topClasses: stats.topClasses,
-				classCounts: stats.classCounts,
-				totalFiles: stats.totalFiles
+				classCounts: stats.classCounts
 			}
 		});
 

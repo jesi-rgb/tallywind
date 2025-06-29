@@ -1,3 +1,5 @@
+import type { Repository } from "./db/schema";
+
 export type SSEEventType = 'progress' | 'file-processed' | 'completed' | 'error';
 
 export type SSEProgressEvent = {
@@ -24,7 +26,7 @@ export type SSEFileProcessedEvent = {
 export type SSECompletedEvent = {
 	type: 'completed';
 	data: {
-		repoId: number;
+		repo: Repository;
 		totalClasses: number;
 		topClasses: Array<{ className: string; count: number }>;
 		classCounts: Record<string, number>;

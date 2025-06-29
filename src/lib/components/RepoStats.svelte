@@ -28,7 +28,7 @@
 
 			<div class="border-border join-item border p-4 text-center">
 				<div class="mb-2 font-mono text-sm uppercase">Files analyzed</div>
-				<div class="text-3xl font-bold">{repoStats.repo.files}</div>
+				<div class="text-3xl font-bold">{repoStats.repo.total_files}</div>
 			</div>
 		</div>
 
