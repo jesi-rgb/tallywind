@@ -27,6 +27,7 @@
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
 		"svelte-meta-tags": "^4.4.0",
+		"sveltekit-search-params": "^3.0.0",
 		"svelteplot": "^0.3.6",
 		"tailwindcss": "^4.1.10",
 		"typescript": "^5.0.0",

@@ -1,12 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { queryParameters } from 'sveltekit-search-params';
 	import type { TailwindStats } from '$lib/services/repository';
 	import AnalysisProgress from '$lib/components/AnalysisProgress.svelte';
 	import RepoStats from '$lib/components/RepoStats.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import { normalizeGitHubUrl } from '$lib/utils/github';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 
-	let repoUrl = $state('');
+	const params = queryParameters({
+		owner: true,
+		name: true
+	});
+
+	let repoUrl = $derived.by(() => {
+		if ($params.name && $params.owner) return `https://github.com/${$params.owner}/${$params.name}`;
+		else return '';
+	});
 	let error = $state<string | null>(null);
 	let repoStats = $state<TailwindStats | null>(null);
 
@@ -19,6 +29,13 @@
 		totalFiles?: number;
 		currentFile?: string;
 	} | null>(null);
+
+	onMount(() => {
+		if ($params.owner && $params.name) {
+			repoUrl = `https://github.com/${$params.owner}/${$params.name}`;
+			handleAnalyze();
+		}
+	});
 
 	async function handleAnalyze() {
 		if (!repoUrl) {
@@ -33,6 +50,8 @@
 		}
 
 		repoUrl = normalizeGitHubUrl(repoUrl);
+		$params.owner = repoUrl.split('/')[3];
+		$params.name = repoUrl.split('/')[4];
 
 		error = null;
 		isAnalyzing = true;
@@ -135,7 +154,20 @@
 			<h1 class="text-4xl font-bold tracking-wider uppercase">TALLYWIND</h1>
 			<p class="mt-2 font-mono text-lg">TAILWIND CLASS COUNTER & ANALYZER</p>
 		</div>
-		<Button href="/global" text="GLOBAL STATS" />
+		<div class="flex gap-3">
+			<Button href="/global" text="GLOBAL STATS" />
+			<Button
+				href="/"
+				onclick={() => {
+					$params.owner = null;
+					$params.name = null;
+					repoStats = null;
+
+					goto('/');
+				}}
+				text="ANALYZER"
+			/>
+		</div>
 	</div>
 
 	<!-- Main Content -->
