@@ -6,6 +6,16 @@ import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
+// Timeout wrapper for promises
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+	return Promise.race([
+		promise,
+		new Promise<never>((_, reject) =>
+			setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs)
+		)
+	]);
+}
+
 // Define types
 type GitHubFile = {
 	name: string;
@@ -26,11 +36,15 @@ export async function getDefaultBranch(owner: string, repo: string): Promise<str
 	try {
 		const repoUrl = `https://github.com/${owner}/${repo}.git`;
 
-		// Use git ls-remote to get the default branch without cloning
-		const { stdout } = await execAsync(`git ls-remote --symref ${repoUrl} HEAD`);
+		// Use git ls-remote to get the default branch without cloning (30s timeout)
+		const { stdout } = await withTimeout(
+			execAsync(`git ls-remote --symref ${repoUrl} HEAD`),
+			30000,
+			'git ls-remote --symref'
+		);
 
 		// Parse the output to find the default branch
-		// Output format: "ref: refs/heads/main	HEAD"
+		// Output format: "ref: refs/heads/main\tHEAD"
 		const match = stdout.match(/ref: refs\/heads\/([^\s]+)/);
 		if (match) {
 			return match[1];
@@ -40,8 +54,10 @@ export async function getDefaultBranch(owner: string, repo: string): Promise<str
 		const commonBranches = ['main', 'master', 'develop'];
 		for (const branch of commonBranches) {
 			try {
-				const { stdout: branchCheck } = await execAsync(
-					`git ls-remote --heads ${repoUrl} ${branch}`
+				const { stdout: branchCheck } = await withTimeout(
+					execAsync(`git ls-remote --heads ${repoUrl} ${branch}`),
+					15000,
+					`git ls-remote --heads ${branch}`
 				);
 				if (branchCheck.trim()) {
 					return branch;
@@ -73,7 +89,7 @@ export async function cloneRepository(
 		// Get default branch if not specified
 		const targetBranch = branch || (await getDefaultBranch(owner, repo));
 
-		// Clone with optimizations for speed and efficiency
+		// Clone with optimizations for speed and efficiency (2 minute timeout)
 		const cloneCommand = [
 			'git clone',
 			'--single-branch',
@@ -84,7 +100,7 @@ export async function cloneRepository(
 		].join(' ');
 
 		console.log(`Cloning repository: ${owner}/${repo} (branch: ${targetBranch})`);
-		await execAsync(cloneCommand);
+		await withTimeout(execAsync(cloneCommand), 120000, 'git clone');
 
 		return {
 			localPath: tempDir,

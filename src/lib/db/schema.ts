@@ -17,6 +17,7 @@ export const repositories = pgTable('repositories', {
 	name: varchar('name', { length: 255 }).notNull(),
 	default_branch: varchar('default_branch', { length: 255 }),
 	analyzed_at: timestamp('analyzed_at').notNull().defaultNow(),
+	processing_started_at: timestamp('processing_started_at'),
 	status: varchar('status', { length: 50 }).notNull().default('pending'),
 	is_eligible: boolean('is_eligible'),
 	has_tailwind: boolean('has_tailwind'),

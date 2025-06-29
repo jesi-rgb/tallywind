@@ -9,7 +9,7 @@ import {
 import * as github from '$lib/github';
 import * as gitClone from '$lib/git-clone';
 import { countTailwindClasses, shouldParseFile } from '$lib/tailwind-parser';
-import { eq, sql, sum } from 'drizzle-orm';
+import { eq, sql, sum, and, lt } from 'drizzle-orm';
 import { SSEEmitter } from '$lib/sse';
 
 export type TailwindStats = {
@@ -65,6 +65,7 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 					name: repo,
 					default_branch: repoAnalysis.defaultBranch,
 					analyzed_at: new Date(),
+					processing_started_at: null,
 					status: 'ineligible',
 					is_eligible: false,
 					has_tailwind: repoAnalysis.eligibility.hasTailwind,
@@ -84,6 +85,7 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 				name: repo,
 				default_branch: repoAnalysis.defaultBranch,
 				analyzed_at: new Date(),
+				processing_started_at: null,
 				status: 'processing',
 				is_eligible: true,
 				has_tailwind: repoAnalysis.eligibility.hasTailwind,
@@ -162,6 +164,7 @@ export async function analyzeRepository(repoUrl: string): Promise<TailwindStats 
 				.set({
 					status: 'completed',
 					analyzed_at: new Date(),
+					processing_started_at: null,
 					total_classes: totalClasses
 				})
 				.where(eq(repositories.id, repoRecord.id));
@@ -221,15 +224,113 @@ export async function getRepositoryByUrl(url: string): Promise<Repository | null
 	}
 }
 
+// Clean up stale processing states (older than 10 minutes)
+export async function cleanupStaleProcessingStates(): Promise<void> {
+	if (!db) return;
+
+	try {
+		const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+
+		await db
+			.update(repositories)
+			.set({
+				status: 'failed',
+				processing_started_at: null
+			})
+			.where(
+				and(
+					eq(repositories.status, 'processing'),
+					lt(repositories.processing_started_at, tenMinutesAgo)
+				)
+			);
+	} catch (error) {
+		console.error('Error cleaning up stale processing states:', error);
+	}
+}
+
+// Try to acquire processing lock for a repository
+export async function tryAcquireProcessingLock(repoUrl: string): Promise<Repository | null> {
+	if (!db) return null;
+
+	try {
+		// First, clean up any stale processing states
+		await cleanupStaleProcessingStates();
+
+		// Check if repo exists and is not currently being processed
+		const [existingRepo] = await db
+			.select()
+			.from(repositories)
+			.where(eq(repositories.url, repoUrl));
+
+		if (existingRepo) {
+			console.log(`[${repoUrl}] Found existing repo with status: ${existingRepo.status}`);
+
+			// If repo is completed, don't acquire lock - let it use cached data path
+			if (existingRepo.status === 'completed') {
+				console.log(`[${repoUrl}] Repository is completed, not acquiring lock`);
+				return null;
+			}
+
+			// If repo exists and is currently processing, return null (can't acquire lock)
+			if (existingRepo.status === 'processing') {
+				console.log(`[${repoUrl}] Repository is currently processing, cannot acquire lock`);
+				return null;
+			}
+
+			// Only acquire lock for failed/ineligible repos that need reprocessing
+			console.log(`[${repoUrl}] Acquiring lock for reprocessing (status: ${existingRepo.status})`);
+			const [updatedRepo] = await db
+				.update(repositories)
+				.set({
+					status: 'processing',
+					processing_started_at: new Date()
+				})
+				.where(eq(repositories.id, existingRepo.id))
+				.returning();
+
+			return updatedRepo;
+		}
+		return null; // Repo doesn't exist yet
+	} catch (error) {
+		console.error('Error acquiring processing lock:', error);
+		return null;
+	}
+}
+
+// Release processing lock and update status
+export async function releaseProcessingLock(repoId: number, finalStatus: string): Promise<void> {
+	if (!db) return;
+
+	try {
+		await db
+			.update(repositories)
+			.set({
+				status: finalStatus,
+				processing_started_at: null,
+				analyzed_at: new Date()
+			})
+			.where(eq(repositories.id, repoId));
+	} catch (error) {
+		console.error('Error releasing processing lock:', error);
+	}
+}
+
 // Get class counts for a repository
 export async function getClassCountsForRepo(repoId: number): Promise<Record<string, number>> {
 	if (!db) return {};
 
 	try {
+		console.log(`[repo:${repoId}] Fetching class counts from database`);
+		const startTime = Date.now();
+
 		const counts = await db
 			.select()
 			.from(tailwindClasses)
 			.where(eq(tailwindClasses.repo_id, repoId));
+
+		console.log(
+			`[repo:${repoId}] Retrieved ${counts.length} class records in ${Date.now() - startTime}ms`
+		);
 
 		const result: Record<string, number> = {};
 		for (const row of counts) {
@@ -238,7 +339,7 @@ export async function getClassCountsForRepo(repoId: number): Promise<Record<stri
 
 		return result;
 	} catch (error) {
-		console.error('Error getting class counts for repo:', error);
+		console.error(`[repo:${repoId}] Error getting class counts:`, error);
 		return {};
 	}
 }
@@ -396,6 +497,8 @@ export async function analyzeRepositoryWithSSE(
 		return;
 	}
 
+	let repoRecord: Repository | null = null;
+
 	try {
 		// Parse GitHub URL
 		const repoInfo = github.parseGitHubUrl(repoUrl);
@@ -408,32 +511,40 @@ export async function analyzeRepositoryWithSSE(
 
 		const { owner, repo } = repoInfo;
 
+		console.log(`[${owner}/${repo}] Starting repository analysis`);
+
 		// Emit initial progress
 		emitter.emit({
 			type: 'progress',
 			data: { status: 'fetching', currentFile: 'Repository metadata' }
 		});
 
-		// Check if we've already analyzed this repo
-		let repoRecord = await getRepositoryByUrl(repoUrl);
-		let isExisting = !!repoRecord;
-
-		// If this is an existing repo, check if we need to update or return cached data
-		if (isExisting && repoRecord && repoRecord.status === 'completed') {
-			// If it was analyzed recently (e.g., within the last 48 hours), return cached results
-			const lastAnalyzed = new Date(repoRecord.analyzed_at);
+		// First, check if repo exists and has valid cached data
+		console.log(`[${owner}/${repo}] Checking for existing repository record`);
+		const existingRepo = await getRepositoryByUrl(repoUrl);
+		if (existingRepo && existingRepo.status === 'completed') {
+			console.log(`[${owner}/${repo}] Found completed repository, checking cache validity`);
+			// Check if cache is still valid (< 48 hours)
+			const lastAnalyzed = new Date(existingRepo.analyzed_at);
 			const now = new Date();
 			const hoursSinceLastUpdate = (now.getTime() - lastAnalyzed.getTime()) / (1000 * 60 * 60);
 
-			if (hoursSinceLastUpdate < 48) {
-				// Return cached results
-				const classCounts = await getClassCountsForRepo(repoRecord.id);
-				const stats = formatTailwindStats(repoRecord, classCounts);
+			console.log(`[${owner}/${repo}] Cache age: ${hoursSinceLastUpdate.toFixed(1)} hours`);
 
+			if (hoursSinceLastUpdate < 48) {
+				// Return cached results immediately - no lock needed
+				console.log(`[${owner}/${repo}] Using cached data, retrieving class counts`);
+				const startTime = Date.now();
+				const classCounts = await getClassCountsForRepo(existingRepo.id);
+				console.log(`[${owner}/${repo}] Class counts retrieved in ${Date.now() - startTime}ms`);
+
+				const stats = formatTailwindStats(existingRepo, classCounts);
+
+				console.log(`[${owner}/${repo}] Returning cached results (${stats.total} total classes)`);
 				emitter.emit({
 					type: 'completed',
 					data: {
-						repo: repoRecord,
+						repo: existingRepo,
 						totalClasses: stats.total,
 						topClasses: stats.topClasses,
 						classCounts: stats.classCounts
@@ -441,10 +552,26 @@ export async function analyzeRepositoryWithSSE(
 				});
 				emitter.close();
 				return;
+			} else {
+				console.log(`[${owner}/${repo}] Cache expired, will reprocess`);
 			}
 		}
+		// Check if repo is currently being processed by another request
+		if (existingRepo && existingRepo.status === 'processing') {
+			console.log(`[${owner}/${repo}] Repository is currently being processed by another request`);
+			emitter.emit({
+				type: 'error',
+				data: { message: 'Repository is currently being processed by another request' }
+			});
+			emitter.close();
+			return;
+		}
+		// Only try to acquire lock if no valid cache exists
+		console.log(`[${owner}/${repo}] No valid cache found, attempting to acquire processing lock`);
+		repoRecord = await tryAcquireProcessingLock(repoUrl);
 
 		if (!repoRecord) {
+			console.log(`[${owner}/${repo}] Could not acquire lock, starting fresh repository analysis`);
 			emitter.emit({
 				type: 'progress',
 				data: { status: 'fetching', currentFile: 'Cloning repository' }
@@ -472,6 +599,7 @@ export async function analyzeRepositoryWithSSE(
 					name: repo,
 					default_branch: repoAnalysis.defaultBranch,
 					analyzed_at: new Date(),
+					processing_started_at: null,
 					status: 'ineligible',
 					is_eligible: false,
 					has_tailwind: eligibility.hasTailwind,
@@ -496,12 +624,12 @@ export async function analyzeRepositoryWithSSE(
 				name: repo,
 				default_branch: repoAnalysis.defaultBranch,
 				analyzed_at: new Date(),
+				processing_started_at: new Date(),
 				status: 'processing',
 				is_eligible: true,
 				has_tailwind: eligibility.hasTailwind,
 				has_package_json: eligibility.packageJsonExists
 			};
-
 			// Insert into database
 			const [insertedRepo] = await db.insert(repositories).values(newRepo).returning();
 			repoRecord = insertedRepo;
@@ -633,6 +761,7 @@ export async function analyzeRepositoryWithSSE(
 				.set({
 					status: 'completed',
 					analyzed_at: new Date(),
+					processing_started_at: null,
 					total_classes: totalClasses
 				})
 				.where(eq(repositories.id, repoRecord.id));
@@ -662,7 +791,14 @@ export async function analyzeRepositoryWithSSE(
 			emitter.close();
 		}
 	} catch (error) {
-		console.error('Error analyzing repository:', error);
+		console.error(`[${repoUrl}] Error analyzing repository:`, error);
+
+		// Release processing lock on error
+		if (repoRecord?.id) {
+			console.log(`[${repoUrl}] Releasing processing lock due to error`);
+			await releaseProcessingLock(repoRecord.id, 'failed');
+		}
+
 		emitter.emit({
 			type: 'error',
 			data: { message: `Error analyzing repository: ${error}` }

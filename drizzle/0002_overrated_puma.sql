@@ -1,0 +1,1 @@
+ALTER TABLE "repositories" ADD COLUMN "processing_started_at" timestamp;
