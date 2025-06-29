@@ -21,7 +21,7 @@
 			{#if progress.totalFiles && progress.filesProcessed !== undefined}
 				<div class="border-border join-item border p-4">
 					<div class="mb-2 font-mono text-sm uppercase">FILES PROCESSED</div>
-					<div class="font-bold">{progress.filesProcessed} / {progress.totalFiles}</div>
+					<div class="font-bold tabular-nums">{progress.filesProcessed} / {progress.totalFiles}</div>
 				</div>
 			{/if}
 		</div>
